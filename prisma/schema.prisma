@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Currency {
+  LYD
+  USD
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum TransactionStatus {
+  PAID
+  PENDING
+  UPCOMING
+}
+
+enum PaymentMethod {
+  CASH
+  LOCAL_CARD
+  INTERNATIONAL_CARD
+  BANK_TRANSFER
+  DIGITAL_WALLET
+  OTHER
+  NOT_APPLICABLE
+}
+
+enum AccountType {
+  CASH_REGISTER
+  BANK_ACCOUNT
+  DIGITAL_WALLET
+  OTHER
+}
+
+model Platform {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions FinancialTransaction[]
+  budgets      MonthlyBudget[]
+
+  @@index([code])
+  @@index([active])
+}
+
+model FinancialTransaction {
+  id              String           @id @default(cuid())
+  description     String
+  descriptionAr   String?
+  amount          Decimal          @db.Decimal(19, 4)
+  currency        Currency
+  type            TransactionType
+  status          TransactionStatus @default(PAID)
+  category        String
+  categoryAr      String?
+  transactionDate DateTime         @db.Date
+  dueDate         DateTime?        @db.Date
+  reference       String?
+  platformId      String?
+  platform        Platform?        @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  paymentMethod   PaymentMethod    @default(NOT_APPLICABLE)
+  paymentProvider String?
+  accountId       String?
+  account         FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  externalReference String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([currency])
+  @@index([type])
+  @@index([status])
+  @@index([category])
+  @@index([platformId])
+  @@index([transactionDate])
+  @@index([currency, transactionDate])
+  @@index([platformId, currency, transactionDate])
+  @@index([paymentMethod])
+  @@index([accountId])
+}
+
+model FinancialAccount {
+  id        String     @id @default(cuid())
+  name      String
+  type      AccountType
+  currency  Currency
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  transactions FinancialTransaction[]
+
+  @@index([currency])
+  @@index([type])
+  @@index([active])
+}
+
+model MonthlyBudget {
+  id        String   @id @default(cuid())
+  month     DateTime @db.Date
+  currency  Currency
+  amount    Decimal  @db.Decimal(19, 4)
+  platformId String?
+  platform   Platform? @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([month, currency, platformId])
+  @@index([month])
+  @@index([currency])
+  @@index([platformId])
+}
+
+model OpeningBalance {
+  id           String   @id @default(cuid())
+  effectiveDate DateTime @db.Date
+  currency     Currency
+  amount       Decimal  @db.Decimal(19, 4)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([effectiveDate, currency])
+  @@index([effectiveDate])
+  @@index([currency])
+}
