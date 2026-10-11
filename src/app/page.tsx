@@ -12,6 +12,7 @@ import KpiCard from '@/components/KpiCard';
 import CashFlowChart from '@/components/CashFlowChart';
 import BudgetBurndown from '@/components/BudgetBurndown';
 import TransactionsTable from '@/components/TransactionsTable';
+import PaymentChannelBreakdown from '@/components/PaymentChannelBreakdown';
 
 interface DashboardApiResponse {
   overview: FinancialOverview;
@@ -312,6 +313,19 @@ export default function DashboardPage() {
                 sentimentType="expense"
               />
             )}
+          </div>
+
+          {/* Payment Channel Breakdown */}
+          <div className="space-y-6">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              {t.paymentChannelBreakdown}
+            </h3>
+            <PaymentChannelBreakdown
+              incomeBreakdown={overview.incomeByPaymentMethod}
+              expensesBreakdown={overview.expensesByPaymentMethod}
+              currency={currency}
+              language={language}
+            />
           </div>
 
           {/* Analytics & Budget Section */}
