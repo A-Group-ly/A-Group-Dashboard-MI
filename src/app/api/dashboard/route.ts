@@ -177,11 +177,13 @@ export async function GET(request: NextRequest) {
       orderBy: { effectiveDate: 'desc' },
     });
 
-    // Get monthly budget
+    // Get monthly budget - use UTC date to match DATE type in PostgreSQL
+    const [year, monthNum] = month.split('-').map(Number);
+    const utcMonthStart = new Date(Date.UTC(year, monthNum - 1, 1));
     const budget = await prisma.monthlyBudget.findFirst({
       where: {
         currency: currency as 'LYD' | 'USD',
-        month: curStart,
+        month: utcMonthStart,
         platformId: null,
       },
     });
