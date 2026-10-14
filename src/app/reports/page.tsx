@@ -3,6 +3,10 @@
 import React from 'react';
 import { useApp } from '@/components/providers/AppProvider';
 import { Card, DemoNotice, Money, PageHeader } from '@/components/ui/primitives';
+import MonthlyReport from '@/components/reports/MonthlyReport';
+import ScopeBar from '@/components/ScopeBar';
+import { useDashboardData } from '@/components/providers/DashboardDataProvider';
+import { PageSkeleton } from '@/components/ui/primitives';
 import ExportCsvButton from '@/components/ExportCsvButton';
 import {
   PRODUCTS,
@@ -56,7 +60,7 @@ function SimpleTable({ head, rows }: { head: string[]; rows: React.ReactNode[][]
   );
 }
 
-export default function ReportsPage() {
+function SubscriptionAnalytics() {
   const { t } = useApp();
   const mrr = mrrByCurrency();
   const aging = agingBuckets();
@@ -78,8 +82,6 @@ export default function ReportsPage() {
 
   return (
     <>
-      <PageHeader title={t('rep.title')} subtitle={t('rep.sub')} actions={<ExportCsvButton />} />
-      <DemoNotice />
 
       <Card title={t('rep.mrrTitle')} hint={t('rep.mrrNote')}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -156,6 +158,48 @@ export default function ReportsPage() {
         <p className="mb-3 text-sm text-muted">{t('rep.exportBody')}</p>
         <ExportCsvButton />
       </Card>
+    </>
+  );
+}
+
+export default function ReportsPage() {
+  const { t } = useApp();
+  const { ready } = useDashboardData();
+  const [tab, setTab] = React.useState<'monthly' | 'analytics'>('monthly');
+
+  if (!ready) return <PageSkeleton />;
+
+  return (
+    <>
+      <div className="no-print">
+        <PageHeader title={t('rep.title')} subtitle={t('rep.sub')} actions={<ExportCsvButton />} />
+        <div role="tablist" aria-label={t('rep.title')} className="mb-5 flex gap-1 border-b border-line">
+          {(
+            [
+              ['monthly', t('rep.tabMonthly')],
+              ['analytics', t('rep.tabAnalytics')],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              role="tab"
+              type="button"
+              aria-selected={tab === k}
+              onClick={() => setTab(k)}
+              className={`border-b-2 px-4 py-2 text-sm font-semibold ${tab === k ? 'border-accent text-accent-strong' : 'border-transparent text-muted hover:text-ink'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {tab === 'monthly' && <ScopeBar />}
+      </div>
+      {tab === 'monthly' ? <MonthlyReport /> : (
+        <>
+          <DemoNotice />
+          <SubscriptionAnalytics />
+        </>
+      )}
     </>
   );
 }

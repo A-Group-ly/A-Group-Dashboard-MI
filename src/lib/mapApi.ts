@@ -1,3 +1,4 @@
+import { keepBrandNames } from './brand.ts';
 import type {
   PaymentMethod,
   PlatformSource,
@@ -58,11 +59,11 @@ export function mapApiTransaction(tx: ApiTransaction): Transaction {
   return {
     id: tx.id,
     description: tx.description,
-    descriptionAr: tx.descriptionAr || tx.description,
+    descriptionAr: keepBrandNames(tx.descriptionAr || tx.description),
     source: (tx.platform && PLATFORM_BY_CODE[tx.platform.code]) || 'Corporate',
     type: tx.type === 'INCOME' ? 'inflow' : 'outflow',
     category: tx.category as TransactionCategory,
-    categoryAr: tx.categoryAr || tx.category,
+    categoryAr: keepBrandNames(tx.categoryAr || tx.category),
     amount: Number(tx.amount),
     currency: tx.currency,
     date,

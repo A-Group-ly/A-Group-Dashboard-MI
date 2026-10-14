@@ -9,11 +9,14 @@ import CashFlowChart from '@/components/CashFlowChart';
 import BudgetBurndown from '@/components/BudgetBurndown';
 import TransactionsTable from '@/components/TransactionsTable';
 import PaymentChannelBreakdown from '@/components/PaymentChannelBreakdown';
-import PlatformFilter from '@/components/PlatformFilter';
+import ScopeBar from '@/components/ScopeBar';
+import ComparisonBars from '@/components/charts/ComparisonBars';
+import { compareBy } from '@/lib/analytics';
+import { getPreviousMonth } from '@/lib/month';
 import DataSourceBanner from '@/components/DataSourceBanner';
 
 export default function OverviewPage() {
-  const { currency, month, platform, lang, tr: t } = useApp();
+  const { currency, month, platform, lang, tr: t, t: ui } = useApp();
   const { overview, transactions, ready } = useDashboardData();
 
   // KPIs are company-wide by design; the platform filter scopes the chart and table.
@@ -22,6 +25,34 @@ export default function OverviewPage() {
     [transactions, platform]
   );
   const monthTx = useMemo(() => scoped.filter((tx) => tx.month === month), [scoped, month]);
+  const prevMonth = getPreviousMonth(month);
+  const expenseByCategory = useMemo(
+    () =>
+      compareBy(scoped, {
+        kind: 'expense',
+        currency,
+        month,
+        previousMonth: prevMonth,
+        language: lang,
+        groupKey: (x) => x.category,
+        label: (x, l) => (l === 'ar' ? x.categoryAr : x.category),
+      }),
+    [scoped, currency, month, prevMonth, lang]
+  );
+  // platform comparison ignores the platform filter on purpose: it shows every platform side by side
+  const incomeByPlatform = useMemo(
+    () =>
+      compareBy(transactions, {
+        kind: 'income',
+        currency,
+        month,
+        previousMonth: prevMonth,
+        language: lang,
+        groupKey: (x) => x.source,
+        label: (x) => x.source,
+      }),
+    [transactions, currency, month, prevMonth, lang]
+  );
 
   if (!ready) return <PageSkeleton />;
 
@@ -30,7 +61,8 @@ export default function OverviewPage() {
 
   return (
     <>
-      <PageHeader title={t.overview} subtitle={scopeText} actions={<PlatformFilter />} />
+      <PageHeader title={t.overview} subtitle={scopeText} />
+      <ScopeBar />
       <DataSourceBanner />
       <DemoNotice text={t.demoDataNotice} />
 
@@ -90,6 +122,12 @@ export default function OverviewPage() {
           language={lang}
           budgetCap={overview.totalExpenses.current + overview.remainingBudget.current}
         />
+      </div>
+
+      <h2 className="mb-3 font-head text-sm font-bold text-ink">{ui('cmp.title')}</h2>
+      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <ComparisonBars title={ui('cmp.incByPlatform')} items={incomeByPlatform} currency={currency} increaseIs="good" currentLabel={ui('cmp.current')} previousLabel={ui('cmp.previous')} highlightKey={platform === 'all' ? undefined : platform} />
+        <ComparisonBars title={ui('cmp.expByCategory')} items={expenseByCategory} currency={currency} increaseIs="bad" currentLabel={ui('cmp.current')} previousLabel={ui('cmp.previous')} />
       </div>
 
       <TransactionsTable transactions={monthTx} currency={currency} language={lang} pageSize={6} />

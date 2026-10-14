@@ -69,7 +69,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         aria-label="Main"
-        className={`fixed inset-y-0 start-0 z-40 flex w-60 flex-col border-e border-line bg-surface transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 start-0 z-40 flex w-60 flex-col border-e border-line bg-surface transition-transform lg:translate-x-0 lg:rtl:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
         }`}
       >

@@ -5,7 +5,7 @@ import { useApp } from '@/components/providers/AppProvider';
 import { useDashboardData } from '@/components/providers/DashboardDataProvider';
 import { DemoNotice, PageHeader, PageSkeleton } from '@/components/ui/primitives';
 import TransactionsTable from '@/components/TransactionsTable';
-import PlatformFilter from '@/components/PlatformFilter';
+import ScopeBar from '@/components/ScopeBar';
 import DataSourceBanner from '@/components/DataSourceBanner';
 import ExportCsvButton from '@/components/ExportCsvButton';
 
@@ -25,13 +25,9 @@ export default function TransactionsPage() {
       <PageHeader
         title={t('nav.transactions')}
         subtitle={tr.transactionsSubtitle}
-        actions={
-          <>
-            <PlatformFilter />
-            <ExportCsvButton />
-          </>
-        }
+        actions={<ExportCsvButton />}
       />
+      <ScopeBar />
       <DataSourceBanner />
       <DemoNotice text={tr.demoDataNotice} />
       <TransactionsTable transactions={rows} currency={currency} language={lang} pageSize={12} />

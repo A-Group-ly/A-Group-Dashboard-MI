@@ -4,8 +4,10 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Design tokens — "Swiss Editorial / Executive Monochrome"
- * Source of truth: docs/design/company-ui-guidelines.md
+ * Design tokens.
+ * Sources: docs/design/company-ui-guidelines.md (structure: flat, hairline rules, sharp corners)
+ * and the live A-Group / A-Stay sites (palette: charcoal #212121, ink #e9eaef, coral #f05e49,
+ * amber focus ring #ffc107, Montserrat).
  */
 :root {
   --bg: #f4f4f5;
@@ -13,52 +15,65 @@
   --surface-2: #fafafa;
   --line: #e4e4e7;
   --line-strong: #d4d4d8;
-  --ink: #111111;
+  --ink: #212121;
   --ink-2: #3f3f46;
-  --muted: #71717a;
+  --muted: #6b6d73;
   --ink-contrast: #ffffff;
-  --accent: #ea580c;
-  --accent-strong: #c2410c;
-  --accent-soft: #fff3ea;
-  --warn: #facc15;
-  --warn-soft: #fdf6dc;
-  --warn-ink: #854d0e;
+  --accent: #f05e49;
+  --accent-strong: #c53a26; /* AA-contrast coral for text on light surfaces */
+  --accent-soft: #fdeeeb;
+  --warn: #ffc107;
+  --warn-soft: #fff6d6;
+  --warn-ink: #7a5600;
   --ok: #16a34a;
-  --ok-soft: #eff7f1;
+  --ok-soft: #eaf6ee;
   --ok-ink: #15803d;
   --bad: #dc2626;
   --bad-soft: #fdeeee;
   --bad-ink: #b91c1c;
-  --header-bg: #111111;
-  --header-ink: #fafafa;
-  --header-line: #26262b;
+  --header-bg: #212121;
+  --header-ink: #e9eaef;
+  --header-line: #3a3a3a;
+  --focus: #212121;
+  /* chart series: brand coral first, then neutral ramp */
+  --chart-1: #f05e49;
+  --chart-2: #212121;
+  --chart-3: #8b8d94;
+  --chart-4: #c7c8cc;
+  --chart-grid: #e4e4e7;
 }
 
 .dark {
-  --bg: #0e0e10;
-  --surface: #161618;
-  --surface-2: #1b1b1e;
-  --line: #2a2a2f;
-  --line-strong: #3a3a41;
-  --ink: #fafafa;
-  --ink-2: #d4d4d8;
-  --muted: #9b9ba5;
-  --ink-contrast: #111111;
-  --accent: #f97316;
-  --accent-strong: #fb923c;
-  --accent-soft: #2a1608;
-  --warn: #eab308;
-  --warn-soft: #2b230b;
-  --warn-ink: #f2d24b;
+  --bg: #1a1a1a;
+  --surface: #272727;
+  --surface-2: #2e2e2e;
+  --line: #3a3a3a;
+  --line-strong: #4a4a4a;
+  --ink: #e9eaef;
+  --ink-2: #cfd0d6;
+  --muted: #a3a4a7;
+  --ink-contrast: #212121;
+  --accent: #f05e49;
+  --accent-strong: #ff8a78;
+  --accent-soft: #3a211d;
+  --warn: #ffc107;
+  --warn-soft: #3a2f0d;
+  --warn-ink: #ffd75e;
   --ok: #3fbf63;
-  --ok-soft: #12281a;
+  --ok-soft: #14291c;
   --ok-ink: #6fd58a;
-  --bad: #ef6a6a;
-  --bad-soft: #2e1414;
-  --bad-ink: #f08a8a;
-  --header-bg: #0a0a0b;
-  --header-ink: #fafafa;
-  --header-line: #222226;
+  --bad: #f05e49;
+  --bad-soft: #3a1d1a;
+  --bad-ink: #ff8f80;
+  --header-bg: #212121;
+  --header-ink: #e9eaef;
+  --header-line: #3a3a3a;
+  --focus: #ffc107;
+  --chart-1: #f05e49;
+  --chart-2: #e9eaef;
+  --chart-3: #8b8d94;
+  --chart-4: #4a4a4a;
+  --chart-grid: #3a3a3a;
 }
 
 @theme inline {
@@ -86,6 +101,10 @@
   --color-header: var(--header-bg);
   --color-header-ink: var(--header-ink);
   --color-header-line: var(--header-line);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
   --font-sans: var(--font-hanken), var(--font-arabic), system-ui, sans-serif;
   --font-head: var(--font-montserrat), var(--font-hanken), var(--font-arabic), system-ui, sans-serif;
   --radius-sm: 2px;
@@ -114,6 +133,14 @@ h4 {
   letter-spacing: -0.01em;
 }
 
+/* Arabic: Latin brand names and numbers keep the Latin heading face */
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] h4 {
+  letter-spacing: 0;
+}
+
 [dir="rtl"] {
   direction: rtl;
 }
@@ -123,7 +150,7 @@ h4 {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -160,4 +187,36 @@ h4 {
   background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 50%, var(--surface-2) 75%);
   background-size: 200% 100%;
   animation: skeleton 1.1s infinite linear;
+}
+
+/* Printing (monthly report -> "Save as PDF") */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+    color: #212121 !important;
+  }
+  .no-print,
+  aside,
+  header {
+    display: none !important;
+  }
+  .lg\:ps-60 {
+    padding-inline-start: 0 !important;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .print-break {
+    break-before: page;
+  }
+  section,
+  tr {
+    break-inside: avoid;
+  }
 }

@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import { getMonthRangeUtc, getPreviousMonth, isValidMonth } from '../src/lib/month.ts';
 import { csvText, transactionsToCsv } from '../src/lib/csv.ts';
 import { mapApiTransaction } from '../src/lib/mapApi.ts';
+import { keepBrandNames } from '../src/lib/brand.ts';
+import { compareBy, pctChange } from '../src/lib/analytics.ts';
 import {
   DEMO_TODAY,
   INVOICES,
@@ -116,4 +118,30 @@ test('overdue status and aging follow the due date relative to DEMO_TODAY', () =
   const agedTotal = Object.values(aging).reduce((s, b) => s + b.LYD, 0);
   const outstandingLyd = INVOICES.filter((i) => (i.status === 'issued' || i.status === 'overdue') && i.currency === 'LYD').reduce((s, i) => s + i.total, 0);
   assert.equal(agedTotal, outstandingLyd); // every outstanding invoice lands in exactly one bucket
+});
+
+test('keepBrandNames keeps brand names in Latin script inside Arabic text', () => {
+  assert.equal(keepBrandNames('حجوزات أي-ستاي'), 'حجوزات A-Stay');
+  assert.equal(keepBrandNames('اشتراكات أي-ماركت وأي-سبيس'), 'اشتراكات A-Market وA-Space');
+  assert.equal(keepBrandNames('وحدات أعمال أ-جروب'), 'وحدات أعمال A-Group');
+  assert.equal(keepBrandNames('already A-Stay'), 'already A-Stay');
+});
+
+test('pctChange never invents a percentage when the base month is empty', () => {
+  assert.equal(pctChange(100, 0), null);
+  assert.equal(pctChange(150, 100), 50);
+  assert.equal(pctChange(50, 100), -50);
+});
+
+test('compareBy groups two months per key, one currency, using the dashboard recognition rules', () => {
+  const tx = (o) => ({ id: Math.random().toString(), currency: 'LYD', type: 'outflow', status: 'paid', source: 'A-Stay', category: 'Ads', categoryAr: 'x', amount: 10, month: '2026-10', ...o });
+  const rows = [
+    tx({ amount: 100 }),
+    tx({ amount: 40, month: '2026-09' }),
+    tx({ amount: 999, status: 'upcoming' }), // not paid -> ignored for expenses
+    tx({ amount: 999, currency: 'USD' }), // other currency -> ignored
+    tx({ amount: 5, category: 'Rent' }),
+  ];
+  const out = compareBy(rows, { kind: 'expense', currency: 'LYD', month: '2026-10', previousMonth: '2026-09', language: 'en', groupKey: (x) => x.category, label: (x) => x.category });
+  assert.deepEqual(out.map((o) => [o.key, o.current, o.previous]), [['Ads', 100, 40], ['Rent', 5, 0]]);
 });

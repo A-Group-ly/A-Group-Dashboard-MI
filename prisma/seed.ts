@@ -266,7 +266,7 @@ async function main() {
   await Promise.all([
     createTransaction({
       description: 'A-Stay September Bookings',
-      descriptionAr: 'حجوزات شهر سبتمبر أي-ستاي',
+      descriptionAr: 'حجوزات شهر سبتمبر A-Stay',
       amount: 132000,
       currency: 'LYD',
       type: 'INCOME',
@@ -282,7 +282,7 @@ async function main() {
     }),
     createTransaction({
       description: 'A-Market September Subscriptions',
-      descriptionAr: 'اشتراكات سبتمبر أي-ماركت',
+      descriptionAr: 'اشتراكات سبتمبر A-Market',
       amount: 54000,
       currency: 'LYD',
       type: 'INCOME',
@@ -298,7 +298,7 @@ async function main() {
     }),
     createTransaction({
       description: 'A-Space September Memberships',
-      descriptionAr: 'عضويات شهر سبتمبر أي-سبيس',
+      descriptionAr: 'عضويات شهر سبتمبر A-Space',
       amount: 34000,
       currency: 'LYD',
       type: 'INCOME',
@@ -352,7 +352,7 @@ async function main() {
   await Promise.all([
     createTransaction({
       description: 'A-Stay Guest Reservations (Sadad/Tadawul Inflows)',
-      descriptionAr: 'حجوزات شاليهات واستراحات أي-ستاي (سداد/تداول)',
+      descriptionAr: 'حجوزات شاليهات واستراحات A-Stay (سداد/تداول)',
       amount: 148500,
       currency: 'LYD',
       type: 'INCOME',
@@ -368,7 +368,7 @@ async function main() {
     }),
     createTransaction({
       description: 'A-Market Wholesale Merchant Subscription Fees',
-      descriptionAr: 'اشتراكات تجار الجملة والموردين - أي-ماركت',
+      descriptionAr: 'اشتراكات تجار الجملة والموردين - A-Market',
       amount: 62000,
       currency: 'LYD',
       type: 'INCOME',
@@ -384,7 +384,7 @@ async function main() {
     }),
     createTransaction({
       description: 'A-Space Desk & Meeting Room Private Leases',
-      descriptionAr: 'إيجارات مكاتب وقاعات اجتماعات أي-سبيس',
+      descriptionAr: 'إيجارات مكاتب وقاعات اجتماعات A-Space',
       amount: 38400,
       currency: 'LYD',
       type: 'INCOME',
@@ -589,7 +589,7 @@ async function main() {
     }),
     createTransaction({
       description: 'Meta & Google Ads Campaign (A-Stay Launch)',
-      descriptionAr: 'حملات إعلانية ممولة (إطلاق أي-ستاي)',
+      descriptionAr: 'حملات إعلانية ممولة (إطلاق A-Stay)',
       amount: 1800,
       currency: 'USD',
       type: 'EXPENSE',

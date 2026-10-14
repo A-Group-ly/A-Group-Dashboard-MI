@@ -10,7 +10,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
   {
     id: "tx-lyd-101",
     description: "A-Stay Guest Reservations (Sadad/Tadawul Inflows)",
-    descriptionAr: "حجوزات شاليهات واستراحات أي-ستاي (سداد/تداول)",
+    descriptionAr: "حجوزات شاليهات واستراحات A-Stay (سداد/تداول)",
     source: "A-Stay",
     type: "inflow",
     category: "Customer Collection",
@@ -25,7 +25,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
   {
     id: "tx-lyd-102",
     description: "A-Market Wholesale Merchant Subscription Fees",
-    descriptionAr: "اشتراكات تجار الجملة والموردين - أي-ماركت",
+    descriptionAr: "اشتراكات تجار الجملة والموردين - A-Market",
     source: "A-Market",
     type: "inflow",
     category: "Customer Collection",
@@ -40,7 +40,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
   {
     id: "tx-lyd-103",
     description: "A-Space Desk & Meeting Room Private Leases",
-    descriptionAr: "إيجارات مكاتب وقاعات اجتماعات أي-سبيس",
+    descriptionAr: "إيجارات مكاتب وقاعات اجتماعات A-Space",
     source: "A-Space",
     type: "inflow",
     category: "Customer Collection",
@@ -102,7 +102,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
   {
     id: "tx-lyd-091",
     description: "A-Stay September Bookings",
-    descriptionAr: "حجوزات شهر سبتمبر أي-ستاي",
+    descriptionAr: "حجوزات شهر سبتمبر A-Stay",
     source: "A-Stay",
     type: "inflow",
     category: "Customer Collection",
@@ -117,7 +117,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
   {
     id: "tx-lyd-092",
     description: "A-Market September Subscriptions",
-    descriptionAr: "اشتراكات سبتمبر أي-ماركت",
+    descriptionAr: "اشتراكات سبتمبر A-Market",
     source: "A-Market",
     type: "inflow",
     category: "Customer Collection",
@@ -132,7 +132,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
   {
     id: "tx-lyd-093",
     description: "A-Space September Memberships",
-    descriptionAr: "عضويات شهر سبتمبر أي-سبيس",
+    descriptionAr: "عضويات شهر سبتمبر A-Space",
     source: "A-Space",
     type: "inflow",
     category: "Customer Collection",
@@ -239,7 +239,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
   {
     id: "tx-usd-105",
     description: "Meta & Google Ads Campaign (A-Stay Launch)",
-    descriptionAr: "حملات إعلانية ممولة (إطلاق أي-ستاي)",
+    descriptionAr: "حملات إعلانية ممولة (إطلاق A-Stay)",
     source: "A-Stay",
     type: "outflow",
     category: "Marketing & Ads",

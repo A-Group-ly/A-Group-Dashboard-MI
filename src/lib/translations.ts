@@ -100,9 +100,9 @@ export const translations = {
     allPlatforms: "كافة المنصات",
     overview: "نظرة عامة",
     platforms: "المنصات التابعة",
-    astay: "أي-ستاي (حجوزات)",
-    amarket: "أي-ماركت (جملة)",
-    aspace: "أي-سبيس (مساحات عمل)",
+    astay: "A-Stay (حجوزات)",
+    amarket: "A-Market (جملة)",
+    aspace: "A-Space (مساحات عمل)",
     expensesTab: "الاشتراكات والمصاريف",
     reports: "التقارير المالية",
     
