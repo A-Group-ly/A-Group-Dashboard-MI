@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getMonthRangeUtc, isValidMonth } from '@/lib/month';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,23 +13,24 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const platformId = searchParams.get('platformId');
     const paymentMethod = searchParams.get('paymentMethod');
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
+    const rawPage = parseInt(searchParams.get('page') || '1', 10);
+    const rawLimit = parseInt(searchParams.get('limit') || '50', 10);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 50;
     const skip = (page - 1) * limit;
 
     // Build where clause
     const where: Record<string, unknown> = {};
 
     if (month) {
-      const [year, monthNum] = month.split('-').map(Number);
-      if (!isNaN(year) && !isNaN(monthNum)) {
-        const startDate = new Date(year, monthNum - 1, 1);
-        const endDate = new Date(year, monthNum, 0, 23, 59, 59);
-        where.transactionDate = {
-          gte: startDate,
-          lte: endDate,
-        };
+      if (!isValidMonth(month)) {
+        return NextResponse.json(
+          { error: 'Invalid month. Use YYYY-MM format' },
+          { status: 400 }
+        );
       }
+      const { start, end } = getMonthRangeUtc(month);
+      where.transactionDate = { gte: start, lte: end };
     }
 
     if (currency && ['LYD', 'USD'].includes(currency)) {
@@ -117,6 +119,8 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    // Let Next.js's own prerender bail-out signal through; it is not a failure.
+    if ((error as { digest?: string })?.digest === 'NEXT_PRERENDER_INTERRUPTED') throw error;
     console.error('Transactions API error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch transactions' },

@@ -4,6 +4,7 @@ import React from 'react';
 import { Currency, Language, Transaction } from '@/types/dashboard';
 import { translations } from '@/lib/translations';
 import { formatCurrency } from '@/lib/calculations';
+import { getPreviousMonth } from '@/lib/month';
 
 interface CashFlowChartProps {
   transactions: Transaction[];
@@ -14,108 +15,74 @@ interface CashFlowChartProps {
 
 export default function CashFlowChart({ transactions, currency, language, selectedMonth }: CashFlowChartProps) {
   const t = translations[language];
-
-  // Calculate previous month from selected month
-  const [yearStr, monthStr] = selectedMonth.split('-');
-  const year = parseInt(yearStr, 10);
-  const month = parseInt(monthStr, 10);
-  const prevDate = new Date(year, month - 2, 1);
-  const prevMonthStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-
-  const months = [prevMonthStr, selectedMonth];
-  
-  // Generate labels dynamically
-  const monthLabels: Record<string, { en: string; ar: string }> = {};
-  months.forEach(m => {
-    const [y, mo] = m.split('-');
-    const date = new Date(parseInt(y), parseInt(mo) - 1, 1);
-    monthLabels[m] = {
-      en: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-      ar: date.toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' }),
-    };
-  });
+  const months = [getPreviousMonth(selectedMonth), selectedMonth];
+  const locale = language === 'ar' ? 'ar-LY-u-nu-latn' : 'en-GB';
 
   const chartData = months.map((m) => {
-    const list = transactions.filter((t) => t.month === m && t.currency === currency);
-    const income = list.filter((t) => t.type === 'inflow' && t.status !== 'upcoming').reduce((sum, t) => sum + t.amount, 0);
-    const expenses = list.filter((t) => t.type === 'outflow' && t.status === 'paid').reduce((sum, t) => sum + t.amount, 0);
-    return { month: m, label: monthLabels[m][language], income, expenses };
+    const list = transactions.filter((tx) => tx.month === m && tx.currency === currency);
+    const income = list.filter((tx) => tx.type === 'inflow' && tx.status !== 'upcoming').reduce((s, tx) => s + tx.amount, 0);
+    const expenses = list.filter((tx) => tx.type === 'outflow' && tx.status === 'paid').reduce((s, tx) => s + tx.amount, 0);
+    const label = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${m}-01T00:00:00Z`));
+    return { month: m, label, income, expenses };
   });
 
-  const maxVal = Math.max(...chartData.flatMap((d) => [d.income, d.expenses]), 100);
+  const maxVal = Math.max(...chartData.flatMap((d) => [d.income, d.expenses]), 1);
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
-      <div className="flex items-center justify-between mb-6">
+    <section className="border border-line bg-surface p-5" aria-labelledby="cashflow-title">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+          <h3 id="cashflow-title" className="font-head text-sm font-bold text-ink">
             {t.cashFlowTitle}
           </h3>
-          <p className="text-xs text-slate-500">{t.cashFlowSubtitle}</p>
+          <p className="text-xs text-muted">{t.cashFlowSubtitle}</p>
         </div>
-        {/* Legend */}
-        <div className="flex items-center gap-4 text-xs font-medium">
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-xs bg-emerald-500"></span>
-            <span className="text-slate-600 dark:text-slate-300">{t.income}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-xs bg-rose-500"></span>
-            <span className="text-slate-600 dark:text-slate-300">{t.expenses}</span>
-          </div>
+        <div className="flex items-center gap-4 text-xs font-medium text-ink-2">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 bg-ink" aria-hidden="true" />
+            {t.income}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 bg-accent" aria-hidden="true" />
+            {t.expenses}
+          </span>
         </div>
       </div>
 
-      {/* Bar Presentation */}
-      <div className="space-y-6 pt-2">
+      <div className="space-y-6">
         {chartData.map((item) => {
-          const incomePct = maxVal > 0 ? (item.income / maxVal) * 100 : 0;
-          const expensesPct = maxVal > 0 ? (item.expenses / maxVal) * 100 : 0;
-
+          const incomePct = (item.income / maxVal) * 100;
+          const expensesPct = (item.expenses / maxVal) * 100;
           return (
             <div key={item.month} className="space-y-2">
-              <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <div className="flex justify-between text-xs font-semibold text-ink-2">
                 <span>{item.label}</span>
-                <span className="font-mono text-slate-400">
+                <span dir="ltr" className="tabular-nums text-muted">
                   {formatCurrency(item.income - item.expenses, currency)} (Net)
                 </span>
               </div>
-
-              {/* Inflow bar */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-slate-100 dark:bg-slate-800 h-6 rounded-md overflow-hidden p-0.5">
-                  {item.income > 0 && (
-                    <div
-                      className="bg-emerald-500 h-full rounded-xs transition-all duration-500 flex items-center justify-end px-2"
-                      style={{ width: `${Math.max(incomePct, 8)}%` }}
-                    >
-                      <span className="text-[10px] font-mono font-bold text-white leading-none">
-                        {formatCurrency(item.income, currency)}
-                      </span>
-                    </div>
-                  )}
+              {[
+                { label: t.income, value: item.income, pct: incomePct, bar: 'bg-ink' },
+                { label: t.expenses, value: item.expenses, pct: expensesPct, bar: 'bg-accent' },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center gap-3">
+                  <span className="w-20 shrink-0 text-[11px] text-muted">{row.label}</span>
+                  <div
+                    className="h-6 flex-1 bg-surface-2"
+                    role="img"
+                    aria-label={`${row.label} ${item.label}: ${formatCurrency(row.value, currency)}`}
+                  >
+                    {row.value > 0 && <div className={`h-full ${row.bar}`} style={{ width: `${Math.max(row.pct, 1)}%` }} />}
+                  </div>
+                  <span dir="ltr" className="w-32 shrink-0 text-end text-xs font-semibold tabular-nums text-ink">
+                    {formatCurrency(row.value, currency)}
+                  </span>
                 </div>
-              </div>
-
-              {/* Outflow bar */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-slate-100 dark:bg-slate-800 h-6 rounded-md overflow-hidden p-0.5">
-                  {item.expenses > 0 && (
-                    <div
-                      className="bg-rose-500 h-full rounded-xs transition-all duration-500 flex items-center justify-end px-2"
-                      style={{ width: `${Math.max(expensesPct, 8)}%` }}
-                    >
-                      <span className="text-[10px] font-mono font-bold text-white leading-none">
-                        {formatCurrency(item.expenses, currency)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
+              ))}
             </div>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

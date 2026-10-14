@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getMonthRangeUtc, getPreviousMonth, isValidMonth } from '@/lib/month';
 
 interface FinancialOverview {
   totalIncome: MetricSummary;
@@ -72,19 +73,6 @@ function calculateMoM(current: number, previous: number, currency: 'LYD' | 'USD'
   };
 }
 
-function getMonthRange(monthStr: string): { start: Date; end: Date } {
-  const [year, month] = monthStr.split('-').map(Number);
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0, 23, 59, 59);
-  return { start, end };
-}
-
-function getPreviousMonth(monthStr: string): string {
-  const [year, month] = monthStr.split('-').map(Number);
-  const date = new Date(year, month - 2, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
 function toNumber(amount: { toNumber: () => number } | number): number {
   return typeof amount === 'number' ? amount : amount.toNumber();
 }
@@ -136,9 +124,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (!isValidMonth(month)) {
+      return NextResponse.json(
+        { error: 'Invalid month. Use YYYY-MM format' },
+        { status: 400 }
+      );
+    }
+
     const prevMonth = getPreviousMonth(month);
-    const { start: curStart, end: curEnd } = getMonthRange(month);
-    const { start: prevStart, end: prevEnd } = getMonthRange(prevMonth);
+    const { start: curStart, end: curEnd } = getMonthRangeUtc(month);
+    const { start: prevStart, end: prevEnd } = getMonthRangeUtc(prevMonth);
 
     // Get all transactions for the currency (company-wide)
     const [curMonthTx, prevMonthTx, allMonthsUpToCur, allMonthsUpToPrev] = await Promise.all([
@@ -282,6 +277,8 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    // Let Next.js's own prerender bail-out signal through; it is not a failure.
+    if ((error as { digest?: string })?.digest === 'NEXT_PRERENDER_INTERRUPTED') throw error;
     console.error('Dashboard API error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch dashboard data' },

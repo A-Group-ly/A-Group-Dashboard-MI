@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# A-Group Subscription & Financial Dashboard
 
-## Getting Started
+Bilingual (EN / AR, RTL) executive dashboard for A-Group Holding. Next.js 16 (App Router), React 19,
+TypeScript, Tailwind 4, Prisma 5 + PostgreSQL.
 
-First, run the development server:
+> **Everything shown is fictional demo data.** No real customer data and no real payment processing.
+> **There is no authentication yet** — every page and API route is public. Do not deploy this build
+> with real data. See `plans/` for the approved scope and roadmap.
+
+## What works today
+
+| Area | Source of data |
+|---|---|
+| Overview, Transactions, Budgets & Cash Flow | PostgreSQL via `/api/dashboard` and `/api/transactions` (falls back to a **clearly labelled** demo set if the database is unreachable) |
+| Organizations, Customers, Subscriptions (+ detail pages), Reports, Alerts & Activity | Static demo data in `src/lib/subscriptionDemo.ts` (read-only; not in the database) |
+| Settings | Browser `localStorage` (theme, language, data source, auto-refresh interval) |
+
+Shell features: light/dark theme, EN/AR with RTL, month and currency (LYD/USD are never combined),
+interactive refresh status (timestamp only moves after a *successful* fetch; failed refreshes keep the last
+valid data), optional auto-refresh that pauses while the tab is hidden, CSV export of transactions.
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env        # then set DATABASE_URL to a NON-production Postgres database
+npx prisma migrate deploy   # apply migrations
+npx prisma db seed          # demo data (idempotent upserts) — never run against production
+npm run dev                 # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Never commit `.env`. `.env.example` lists variable names only.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Purpose |
+|---|---|
+| `npm run dev` / `npm run build` / `npm start` | Next.js |
+| `npm run lint` | ESLint |
+| `npm test` | Unit tests for pure logic (`tests/`, Node's built-in runner) |
+| `node test-financial-calculations.js` | Read-only regression checks against the seeded database |
 
-## Learn More
+## Layout
 
-To learn more about Next.js, take a look at the following resources:
+- `src/app/` — routes (`/`, `/organizations`, `/customers[/id]`, `/subscriptions[/id]`, `/transactions`, `/budgets`, `/reports`, `/alerts`, `/settings`) and API routes
+- `src/components/providers/` — app preferences and dashboard data (fetching, refresh status)
+- `src/components/ui/` — design-system primitives and the shared `DataTable`
+- `src/lib/` — calculations, API→UI mapping, month helpers, CSV, translations, demo data
+- `docs/design/company-ui-guidelines.md` — visual source of truth; `plans/` — product scope and roadmap
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Not implemented yet (see `plans/implementation-roadmap.md`)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Authentication / roles / tenant isolation, create-edit workflows, TV mode, CI, deployment configuration,
+and database models for organizations, customers, subscriptions, invoices and payments.
