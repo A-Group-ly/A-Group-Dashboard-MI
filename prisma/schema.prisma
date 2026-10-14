@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -9,6 +10,10 @@ datasource db {
   // Neon's pooled `-pooler` URL cannot run migrations. Locally, point this at the same database as DATABASE_URL.
   directUrl = env("DATABASE_URL_UNPOOLED")
 }
+
+// ============================================================================
+// Enums
+// ============================================================================
 
 enum Currency {
   LYD
@@ -43,98 +48,366 @@ enum AccountType {
   OTHER
 }
 
-model Platform {
-  id        String   @id @default(cuid())
-  name      String
-  code      String   @unique
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum Role {
+  ADMIN
+  FINANCE
+  ANALYST
+  READ_ONLY
+}
 
+enum OrgKind {
+  INTERNAL
+  EXTERNAL
+}
+
+enum ActiveStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  SMALL_BUSINESS
+  MEDIUM_BUSINESS
+  ENTERPRISE
+  PUBLIC_SECTOR
+}
+
+enum BillingInterval {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  PAST_DUE
+  PAUSED
+  CANCELED
+  EXPIRED
+}
+
+// "Overdue" is derived (ISSUED and past due date), never stored.
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  VOID
+}
+
+enum BillingPaymentStatus {
+  SUCCEEDED
+  FAILED
+  PENDING
+}
+
+// ============================================================================
+// Identity, organizations, roles
+// ============================================================================
+
+model Organization {
+  id        String       @id @default(cuid())
+  name      String
+  kind      OrgKind      @default(EXTERNAL)
+  industry  String?
+  city      String?
+  country   String?
+  email     String?
+  status    ActiveStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  memberships Membership[]
+
+  // Tenant-owned business data. Every row below carries organizationId.
+  platforms        Platform[]
+  transactions     FinancialTransaction[]
+  accounts         FinancialAccount[]
+  budgets          MonthlyBudget[]
+  openingBalances  OpeningBalance[]
+  customers        Customer[]
+  linkedCustomers  Customer[]             @relation("CustomerLinkedOrg")
+  products         Product[]
+  plans            Plan[]
+  subscriptions    Subscription[]
+  invoices         Invoice[]
+  billingPayments  BillingPayment[]
+
+  @@index([kind])
+}
+
+model User {
+  id          String   @id @default(cuid())
+  clerkUserId String   @unique
+  email       String?
+  name        String?
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships Membership[]
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  role           Role         @default(READ_ONLY)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+// ============================================================================
+// Finance (existing models, now tenant-scoped)
+// ============================================================================
+
+model Platform {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  code           String
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   transactions FinancialTransaction[]
   budgets      MonthlyBudget[]
 
-  @@index([code])
+  @@unique([organizationId, code])
   @@index([active])
 }
 
 model FinancialTransaction {
-  id              String           @id @default(cuid())
-  description     String
-  descriptionAr   String?
-  amount          Decimal          @db.Decimal(19, 4)
-  currency        Currency
-  type            TransactionType
-  status          TransactionStatus @default(PAID)
-  category        String
-  categoryAr      String?
-  transactionDate DateTime         @db.Date
-  dueDate         DateTime?        @db.Date
-  reference       String?
-  platformId      String?
-  platform        Platform?        @relation(fields: [platformId], references: [id], onDelete: SetNull)
-  paymentMethod   PaymentMethod    @default(NOT_APPLICABLE)
-  paymentProvider String?
-  accountId       String?
-  account         FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  id                String            @id @default(cuid())
+  organizationId    String
+  description       String
+  descriptionAr     String?
+  amount            Decimal           @db.Decimal(19, 4)
+  currency          Currency
+  type              TransactionType
+  status            TransactionStatus @default(PAID)
+  category          String
+  categoryAr        String?
+  transactionDate   DateTime          @db.Date
+  dueDate           DateTime?         @db.Date
+  reference         String?
+  platformId        String?
+  paymentMethod     PaymentMethod     @default(NOT_APPLICABLE)
+  paymentProvider   String?
+  accountId         String?
   externalReference String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
-  @@index([currency])
-  @@index([type])
-  @@index([status])
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  platform     Platform?         @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  account      FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, currency, transactionDate])
+  @@index([organizationId, platformId, currency, transactionDate])
+  @@index([organizationId, type, status])
   @@index([category])
-  @@index([platformId])
-  @@index([transactionDate])
-  @@index([currency, transactionDate])
-  @@index([platformId, currency, transactionDate])
   @@index([paymentMethod])
   @@index([accountId])
 }
 
 model FinancialAccount {
-  id        String     @id @default(cuid())
-  name      String
-  type      AccountType
-  currency  Currency
-  active    Boolean    @default(true)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id             String      @id @default(cuid())
+  organizationId String
+  name           String
+  type           AccountType
+  currency       Currency
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   transactions FinancialTransaction[]
 
-  @@index([currency])
-  @@index([type])
-  @@index([active])
+  @@index([organizationId, currency])
 }
 
+// NOTE: company-wide budgets have platformId = NULL, and PostgreSQL treats NULLs as distinct in a
+// plain unique index. The migration therefore adds a partial unique index for the NULL case.
 model MonthlyBudget {
-  id        String   @id @default(cuid())
-  month     DateTime @db.Date
-  currency  Currency
-  amount    Decimal  @db.Decimal(19, 4)
-  platformId String?
-  platform   Platform? @relation(fields: [platformId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  organizationId String
+  month          DateTime @db.Date
+  currency       Currency
+  amount         Decimal  @db.Decimal(19, 4)
+  platformId     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  @@unique([month, currency, platformId])
-  @@index([month])
-  @@index([currency])
-  @@index([platformId])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  platform     Platform?    @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, month, currency, platformId])
+  @@index([organizationId, month])
 }
 
 model OpeningBalance {
-  id           String   @id @default(cuid())
-  effectiveDate DateTime @db.Date
-  currency     Currency
-  amount       Decimal  @db.Decimal(19, 4)
-  notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(cuid())
+  organizationId String
+  effectiveDate  DateTime @db.Date
+  currency       Currency
+  amount         Decimal  @db.Decimal(19, 4)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  @@unique([effectiveDate, currency])
-  @@index([effectiveDate])
-  @@index([currency])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, effectiveDate, currency])
+  @@index([organizationId, effectiveDate])
+}
+
+// ============================================================================
+// Customers, catalog, subscriptions, billing (all tenant-scoped)
+// ============================================================================
+
+model Customer {
+  id                   String       @id @default(cuid())
+  organizationId       String
+  type                 CustomerType @default(INDIVIDUAL)
+  displayName          String
+  businessName         String?
+  linkedOrganizationId String?
+  email                String
+  phone                String?
+  city                 String?
+  country              String?
+  status               ActiveStatus @default(ACTIVE)
+  notes                String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  organization       Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  linkedOrganization Organization?   @relation("CustomerLinkedOrg", fields: [linkedOrganizationId], references: [id], onDelete: SetNull)
+  subscriptions      Subscription[]
+  invoices           Invoice[]
+  payments           BillingPayment[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, displayName])
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  category       String?
+  description    String?
+  status         ActiveStatus @default(ACTIVE)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  plans        Plan[]
+
+  @@index([organizationId])
+}
+
+model Plan {
+  id             String          @id @default(cuid())
+  organizationId String
+  productId      String
+  name           String
+  interval       BillingInterval @default(MONTHLY)
+  price          Decimal         @db.Decimal(19, 4)
+  currency       Currency
+  trialDays      Int             @default(0)
+  status         ActiveStatus    @default(ACTIVE)
+  features       String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  subscriptions Subscription[]
+
+  @@index([organizationId, productId])
+}
+
+// Price, currency and interval are copied onto the subscription so that later plan price changes
+// never rewrite the commercial terms of existing subscribers.
+model Subscription {
+  id             String             @id @default(cuid())
+  organizationId String
+  customerId     String
+  planId         String
+  status         SubscriptionStatus @default(ACTIVE)
+  startDate      DateTime           @db.Date
+  nextRenewal    DateTime?          @db.Date
+  canceledDate   DateTime?          @db.Date
+  price          Decimal            @db.Decimal(19, 4)
+  currency       Currency
+  interval       BillingInterval
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  plan         Plan         @relation(fields: [planId], references: [id], onDelete: Restrict)
+  invoices     Invoice[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, customerId])
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  organizationId String
+  number         String
+  customerId     String
+  subscriptionId String?
+  currency       Currency
+  total          Decimal       @db.Decimal(19, 4)
+  issueDate      DateTime      @db.Date
+  dueDate        DateTime      @db.Date
+  paidDate       DateTime?     @db.Date
+  status         InvoiceStatus @default(ISSUED)
+  note           String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer     Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  subscription Subscription?    @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  payments     BillingPayment[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status, dueDate])
+  @@index([organizationId, currency, issueDate])
+}
+
+// Simulated payment attempts. No real money moves; no card data is ever stored.
+model BillingPayment {
+  id             String               @id @default(cuid())
+  organizationId String
+  invoiceId      String
+  customerId     String
+  date           DateTime             @db.Date
+  amount         Decimal              @db.Decimal(19, 4)
+  currency       Currency
+  method         String
+  status         BillingPaymentStatus
+  createdAt      DateTime             @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invoice      Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status, date])
+  @@index([invoiceId])
 }
