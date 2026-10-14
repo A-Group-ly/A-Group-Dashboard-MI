@@ -7,7 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test \"tests/**/*.test.mjs\""
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "postinstall": "prisma generate",
+    "typecheck": "tsc --noEmit",
+    "build:cf": "opennextjs-cloudflare build",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "secrets:put": "bash scripts/put-secrets.sh"
   },
   "dependencies": {
     "@clerk/nextjs": "7.9.15",

@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+// workerd resolves '@prisma/client' to the Node engine, which cannot run there; the wasm build can.
+import { PrismaClient as PrismaClientWasm } from '@prisma/client/wasm';
 import { PrismaNeon } from '@prisma/adapter-neon';
 import { Pool } from '@neondatabase/serverless';
 
@@ -21,7 +23,7 @@ export function getPrisma(): PrismaClient {
 
   if (isWorkers()) {
     const adapter = new PrismaNeon(new Pool({ connectionString: url }));
-    return new PrismaClient({ adapter, log: ['error'] });
+    return new PrismaClientWasm({ adapter, log: ['error'] }) as unknown as PrismaClient;
   }
 
   if (!globalForPrisma.__agPrisma) {
