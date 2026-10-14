@@ -152,6 +152,77 @@ async function seedSubscriptionDomain() {
   }
 
   console.log('✅ Customers, catalog, subscriptions, invoices and simulated payments created');
+  await seedRecentBilling();
+}
+
+/**
+ * Recent (Sep / Oct 2026) fictional billing so "total paid", "outstanding" and "expected by month end"
+ * have realistic content around the demo date. Deterministic ids, idempotent.
+ * [subscriptionId, month, amount, issue, due, paidDate | null]
+ */
+async function seedRecentBilling() {
+  const rows: [string, string, number, string, string, string | null][] = [
+    ['sub_001', 'sep', 950, '2026-09-01', '2026-09-15', '2026-09-05'],
+    ['sub_002', 'sep', 2200, '2026-09-01', '2026-09-15', '2026-09-09'],
+    ['sub_005', 'sep', 600, '2026-09-01', '2026-09-15', '2026-09-07'],
+    ['sub_006', 'sep', 450, '2026-09-01', '2026-09-15', '2026-09-10'],
+    ['sub_007', 'sep', 1400, '2026-09-01', '2026-09-15', '2026-09-04'],
+    ['sub_009', 'sep', 199, '2026-09-01', '2026-09-15', '2026-09-08'],
+    ['sub_010', 'sep', 24, '2026-09-01', '2026-09-15', '2026-09-06'],
+    ['sub_013', 'sep', 9, '2026-09-01', '2026-09-15', '2026-09-11'],
+    ['sub_001', 'oct', 950, '2026-10-01', '2026-10-15', '2026-10-03'],
+    ['sub_005', 'oct', 600, '2026-10-01', '2026-10-15', '2026-10-06'],
+    ['sub_007', 'oct', 1400, '2026-10-01', '2026-10-15', '2026-10-02'],
+    ['sub_010', 'oct', 24, '2026-10-01', '2026-10-15', '2026-10-04'],
+    ['sub_013', 'oct', 9, '2026-10-01', '2026-10-15', '2026-10-09'],
+    // still open: due today / later this month
+    ['sub_006', 'oct', 450, '2026-10-01', '2026-10-15', null],
+    ['sub_002', 'oct', 2200, '2026-10-10', '2026-10-25', null],
+    ['sub_009', 'oct', 199, '2026-10-12', '2026-10-29', null],
+  ];
+
+  let n = 100;
+  for (const [subId, month, amount, issue, due, paid] of rows) {
+    n += 1;
+    const sub = SUBSCRIPTIONS.find((s) => s.id === subId)!;
+    const plan = PLANS.find((p) => p.id === sub.planId)!;
+    const id = `inv_recent_${month}_${subId}`;
+    await prisma.invoice.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        organizationId: ORG_ID,
+        number: `INV-2026-0${n}`,
+        customerId: sub.customerId,
+        subscriptionId: subId,
+        currency: plan.currency,
+        total: amount,
+        issueDate: new Date(issue),
+        dueDate: new Date(due),
+        paidDate: paid ? new Date(paid) : null,
+        status: paid ? 'PAID' : 'ISSUED',
+      },
+    });
+    if (paid) {
+      await prisma.billingPayment.upsert({
+        where: { id: `pay_${id}` },
+        update: {},
+        create: {
+          id: `pay_${id}`,
+          organizationId: ORG_ID,
+          invoiceId: id,
+          customerId: sub.customerId,
+          date: new Date(paid),
+          amount,
+          currency: plan.currency,
+          method: n % 2 ? 'Bank transfer (simulated)' : 'Card on file (simulated)',
+          status: 'SUCCEEDED',
+        },
+      });
+    }
+  }
+  console.log('✅ Recent (Sep/Oct 2026) simulated billing created');
 }
 
 async function main() {

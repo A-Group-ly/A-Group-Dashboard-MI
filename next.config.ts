@@ -1,9 +1,7 @@
-import type { NextConfig } from "next";
+﻿import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Tailwind 4 through Turbopack's loader (unchanged).
   turbopack: {
     rules: {
       "*.css": {

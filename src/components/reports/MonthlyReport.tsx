@@ -3,10 +3,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/components/providers/AppProvider';
 import { useDashboardData } from '@/components/providers/DashboardDataProvider';
+import { useTransactions } from '@/components/providers/useTransactions';
 import { formatCurrency } from '@/lib/calculations';
-import { monthLabel, periodLabel } from '@/lib/format';
-import { getPreviousMonth } from '@/lib/month';
+import { formatRange } from '@/lib/period';
 import { PLATFORMS, monthInNumbers, pctChange } from '@/lib/analytics';
+import { ErrorState, PageSkeleton } from '@/components/ui/primitives';
 import type { Transaction } from '@/types/dashboard';
 
 /* ---------- draft (manager-written text, kept in this browser only) ---------- */
@@ -36,7 +37,7 @@ interface Draft {
 const EMPTY: Draft = { dept: '', preparedBy: '', forWho: '', issued: '', problems: '', team: '', strengths: '', weaknesses: '', proposals: [] };
 
 const inputCls =
-  'w-full border border-line-strong bg-surface px-2.5 py-1.5 text-sm text-ink focus:border-accent focus:outline-none print:border-0 print:p-0';
+  'w-full border border-line-strong bg-surface px-2.5 py-1.5 text-sm text-ink transition-colors focus:border-accent focus:outline-none print:border-0 print:p-0';
 
 /** Wrapped in LRI/PDI so the sign and % keep their order inside Arabic sentences. */
 function pctText(change: number | null, na: string): string {
@@ -58,15 +59,15 @@ function Pill({ children }: { children: React.ReactNode }) {
 }
 
 export default function MonthlyReport() {
-  const { t, tr, lang, month, currency } = useApp();
-  const { overview, transactions, source } = useDashboardData();
-  const prev = getPreviousMonth(month);
-  const draftKey = `ag_report_draft_v1_${month}`;
+  const { t, tr, lang, range, previous, period, currency } = useApp();
+  const { data, loading, error, refresh } = useDashboardData();
+  const tx = useTransactions(200);
+  const draftKey = `ag_report_draft_v2_${range.from}_${range.to}`;
 
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
-  // Load the saved draft for this month (after mount; storage is client-only).
+  // Load the saved draft for this period (after mount; storage is client-only).
   useEffect(() => {
     let saved: Draft = EMPTY;
     try {
@@ -75,7 +76,7 @@ export default function MonthlyReport() {
     } catch {
       /* ignore corrupt or unavailable storage */
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate draft from localStorage when the month changes
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate draft from localStorage when the period changes
     setDraft(saved);
     setLoadedKey(draftKey);
   }, [draftKey]);
@@ -93,19 +94,24 @@ export default function MonthlyReport() {
       return next;
     });
 
+  const overview = data?.overview;
+  const rows = useMemo(() => (overview ? monthInNumbers(overview, currency) : []), [overview, currency]);
+
+  if (loading) return <PageSkeleton />;
+  if (!data || !overview) return <ErrorState message={error ?? t('err.server')} onRetry={refresh} />;
+
   const fmt = (n: number) => formatCurrency(n, currency);
   const na = t('cmp.na');
-  const rows = useMemo(() => monthInNumbers(overview, currency), [overview, currency]);
-  const cap = overview.totalExpenses.current + overview.remainingBudget.current;
-  const budgetPct = cap > 0 ? (overview.totalExpenses.current / cap) * 100 : null;
+  const periodText = formatRange(range, lang, period.granularity);
+  const prevText = formatRange(previous, lang, period.granularity === 'custom' ? undefined : period.granularity);
+  const cap = data.meta.budgetCap;
+  const budgetPct = data.meta.budgetConfigured && cap > 0 ? (overview.totalExpenses.current / cap) * 100 : null;
 
   /* ---- executive summary (derived from the data only) ---- */
   const netChange = pctChange(overview.netResult.current, overview.netResult.previous);
   const incomeChange = pctChange(overview.totalIncome.current, overview.totalIncome.previous);
   const expChange = pctChange(overview.totalExpenses.current, overview.totalExpenses.previous);
-  const headline = `${t('mr.headlineNet')} ${fmt(overview.netResult.current)} ${
-    netChange === null ? `(${t('mr.noComparison')})` : pctText(netChange, na)
-  }`;
+  const headline = `${t('mr.headlineNet')} ${fmt(overview.netResult.current)} ${netChange === null ? `(${t('mr.noComparison')})` : pctText(netChange, na)}`;
   const resultsLine = `${tr.kpiIncome}: ${fmt(overview.totalIncome.current)} ${t('scope.vs')} ${fmt(overview.totalIncome.previous)} ${pctText(incomeChange, na)} · ${tr.kpiExpenses}: ${fmt(
     overview.totalExpenses.current
   )} ${t('scope.vs')} ${fmt(overview.totalExpenses.previous)} ${pctText(expChange, na)}`;
@@ -113,38 +119,38 @@ export default function MonthlyReport() {
   const autoProblems: string[] = [];
   if (budgetPct !== null && budgetPct > 100) autoProblems.push(`${t('mr.negBudgetOver')} (${budgetPct.toFixed(0)}%)`);
   else if (budgetPct !== null && budgetPct >= 80) autoProblems.push(`${t('mr.negBudgetNear')} (${budgetPct.toFixed(0)}%)`);
+  if (data.position.overdueCount > 0) autoProblems.push(`${t('status.overdue')}: ${fmt(data.position.overdue)} (${data.position.overdueCount})`);
   if (overview.pendingIncomeTotal > 0) autoProblems.push(`${t('mr.negPending')}: ${fmt(overview.pendingIncomeTotal)}`);
 
   const positives: string[] = [];
-  const negatives: string[] = [...autoProblems.filter((p) => !p.startsWith(t('mr.negPending')))];
+  const negatives: string[] = [...autoProblems];
   if (incomeChange !== null) (incomeChange >= 0 ? positives : negatives).push(incomeChange >= 0 ? t('mr.posIncomeUp') : t('mr.negIncomeDown'));
   if (expChange !== null) (expChange <= 0 ? positives : negatives).push(expChange <= 0 ? t('mr.posExpDown') : t('mr.negExpUp'));
   if (budgetPct !== null && budgetPct < 80) positives.push(t('mr.posBudgetOk'));
-  if (overview.pendingIncomeTotal > 0) negatives.push(`${t('mr.negPending')}: ${fmt(overview.pendingIncomeTotal)}`);
 
-  /* ---- delivered, per platform ---- */
-  const monthTx = transactions.filter((x) => x.currency === currency);
+  /* ---- delivered, per platform (current from transactions, previous from the server comparison) ---- */
+  const txRows: Transaction[] = tx.rows ?? [];
+  const previousIncomeByPlatform = new Map(data.breakdown.incomeByPlatform.map((b) => [b.label, b.previous]));
   const delivered = PLATFORMS.map((p) => {
-    const cur = monthTx.filter((x) => x.source === p && x.month === month);
-    const old = monthTx.filter((x) => x.source === p && x.month === prev);
-    const inc = (list: Transaction[]) => list.filter((x) => x.type === 'inflow' && x.status !== 'upcoming');
-    const exp = (list: Transaction[]) => list.filter((x) => x.type === 'outflow' && x.status === 'paid');
+    const cur = txRows.filter((x) => x.source === p);
+    const inc = cur.filter((x) => x.type === 'inflow' && x.status !== 'upcoming');
+    const exp = cur.filter((x) => x.type === 'outflow' && x.status === 'paid');
     const sum = (list: Transaction[]) => list.reduce((s, x) => s + x.amount, 0);
     const top = (list: Transaction[]) => {
       const m = new Map<string, number>();
-      for (const x of list) m.set(lang === 'ar' ? x.categoryAr : x.category, (m.get(lang === 'ar' ? x.categoryAr : x.category) ?? 0) + x.amount);
+      for (const x of list) {
+        const k = lang === 'ar' ? x.categoryAr : x.category;
+        m.set(k, (m.get(k) ?? 0) + x.amount);
+      }
       return [...m.entries()].sort((a, b) => b[1] - a[1])[0];
     };
-    return { p, cur, incNow: sum(inc(cur)), incPrev: sum(inc(old)), expNow: sum(exp(cur)), nInc: inc(cur).length, nExp: exp(cur).length, topInc: top(inc(cur)), topExp: top(exp(cur)) };
-  }).filter((d) => d.cur.length > 0);
+    return { p, n: cur.length, incNow: sum(inc), incPrev: previousIncomeByPlatform.get(p) ?? 0, expNow: sum(exp), nInc: inc.length, nExp: exp.length, topInc: top(inc), topExp: top(exp) };
+  }).filter((d) => d.n > 0);
 
-  /* ---- carried over: anything not yet paid this month ---- */
-  const carried = monthTx
-    .filter((x) => x.month === month && x.status !== 'paid')
-    .sort((a, b) => a.date.localeCompare(b.date));
-
+  /* ---- carried over: anything not yet paid in the period ---- */
+  const carried = txRows.filter((x) => x.status !== 'paid').sort((a, b) => a.date.localeCompare(b.date));
   const statusLabel = (s: string) => (s === 'upcoming' ? tr.statusUpcoming : tr.statusPending);
-  const origin = source === 'live' ? t('mr.originLive') : t('mr.originDemo');
+
   const sourceRows: [string, number][] = [
     [tr.kpiIncome, overview.totalIncome.current],
     [tr.kpiExpenses, overview.totalExpenses.current],
@@ -152,44 +158,36 @@ export default function MonthlyReport() {
     [tr.kpiCashCollected, overview.cashCollected.current],
     [tr.kpiPendingIncome, overview.pendingIncomeTotal],
     [tr.upcomingObligations, overview.upcomingObligationsTotal],
+    [t('pos.paid'), data.position.paid],
+    [t('pos.outstanding'), data.position.outstanding],
   ];
 
   const addProposal = () =>
-    update({
-      proposals: [...draft.proposals, { id: String(Date.now()), proposal: '', why: '', impact: '', cost: '', priority: 'medium', decision: '' }],
-    });
-  const patchProposal = (id: string, patch: Partial<Proposal>) =>
-    update({ proposals: draft.proposals.map((p) => (p.id === id ? { ...p, ...patch } : p)) });
+    update({ proposals: [...draft.proposals, { id: String(Date.now()), proposal: '', why: '', impact: '', cost: '', priority: 'medium', decision: '' }] });
+  const patchProposal = (id: string, patch: Partial<Proposal>) => update({ proposals: draft.proposals.map((p) => (p.id === id ? { ...p, ...patch } : p)) });
 
   return (
     <article aria-label={t('mr.title')}>
       <div className="no-print mb-5 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="border border-ink bg-ink px-3 py-1.5 text-xs font-semibold text-ink-contrast hover:opacity-85"
-        >
+        <button type="button" onClick={() => window.print()} className="border border-ink bg-ink px-3 py-1.5 text-xs font-semibold text-ink-contrast transition-all duration-150 hover:opacity-85 active:scale-95">
           {t('mr.print')}
         </button>
         <p className="text-xs text-muted">{t('mr.draftNote')}</p>
       </div>
 
-      {/* Cover band, as in the company template */}
       <header className="mb-8 bg-header px-6 py-6 text-header-ink">
         <div className="flex flex-wrap justify-between gap-2 text-xs text-header-ink/70">
           <span className="font-semibold">A-Group</span>
-          <span>
-            {draft.dept || t('mr.deptDefault')} · {monthLabel(month, lang)}
-          </span>
+          <span dir="auto">{draft.dept || t('mr.deptDefault')} · {periodText}</span>
         </div>
         <h1 className="mt-6 font-head text-3xl font-bold">{draft.dept || t('mr.deptDefault')}</h1>
         <div className="mt-2 h-[3px] w-24 bg-accent" aria-hidden="true" />
-        <p className="mt-3 text-lg font-semibold">{monthLabel(month, lang)}</p>
+        <p className="mt-3 text-lg font-semibold" dir="auto">{periodText}</p>
         <p className="text-sm text-header-ink/70">{t('mr.reportTo')}</p>
         <dl className="mt-6 grid grid-cols-1 gap-4 border-t border-header-line pt-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <dt className="text-[11px] uppercase tracking-wider text-header-ink/60">{t('mr.period')}</dt>
-            <dd dir="ltr" className="mt-1 font-semibold">{periodLabel(month, lang)}</dd>
+            <dd dir="auto" className="mt-1 font-semibold">{periodText} <span className="text-header-ink/60">({t('scope.vs')} {prevText})</span></dd>
           </div>
           {(
             [
@@ -201,26 +199,14 @@ export default function MonthlyReport() {
             <div key={k}>
               <dt className="text-[11px] uppercase tracking-wider text-header-ink/60">{label}</dt>
               <dd className="mt-1">
-                <input
-                  aria-label={label}
-                  value={draft[k]}
-                  onChange={(e) => update({ [k]: e.target.value })}
-                  className="w-full border-b border-header-line bg-transparent py-0.5 text-sm font-semibold text-header-ink placeholder:text-header-ink/40 focus:border-accent focus:outline-none"
-                  placeholder="…"
-                />
+                <input aria-label={label} value={draft[k]} onChange={(e) => update({ [k]: e.target.value })} className="w-full border-b border-header-line bg-transparent py-0.5 text-sm font-semibold text-header-ink placeholder:text-header-ink/40 focus:border-accent focus:outline-none" placeholder="…" />
               </dd>
             </div>
           ))}
           <div>
             <dt className="text-[11px] uppercase tracking-wider text-header-ink/60">{t('mr.issued')}</dt>
             <dd className="mt-1">
-              <input
-                type="date"
-                aria-label={t('mr.issued')}
-                value={draft.issued}
-                onChange={(e) => update({ issued: e.target.value })}
-                className="w-full border-b border-header-line bg-transparent py-0.5 text-sm font-semibold text-header-ink focus:border-accent focus:outline-none"
-              />
+              <input type="date" aria-label={t('mr.issued')} value={draft.issued} onChange={(e) => update({ issued: e.target.value })} className="w-full border-b border-header-line bg-transparent py-0.5 text-sm font-semibold text-header-ink focus:border-accent focus:outline-none" />
             </dd>
           </div>
         </dl>
@@ -238,14 +224,7 @@ export default function MonthlyReport() {
                 {autoProblems.map((p) => (
                   <p key={p}>– {p}</p>
                 ))}
-                <textarea
-                  aria-label={t('mr.problems')}
-                  rows={2}
-                  value={draft.problems}
-                  onChange={(e) => update({ problems: e.target.value })}
-                  placeholder={t('mr.writeHere')}
-                  className={`${inputCls}`}
-                />
+                <textarea aria-label={t('mr.problems')} rows={2} value={draft.problems} onChange={(e) => update({ problems: e.target.value })} placeholder={t('mr.writeHere')} className={inputCls} />
               </div>,
             ],
             [
@@ -255,12 +234,7 @@ export default function MonthlyReport() {
                 <textarea aria-label={t('mr.team')} rows={2} value={draft.team} onChange={(e) => update({ team: e.target.value })} placeholder={t('mr.writeHere')} className={inputCls} />
               </div>,
             ],
-            [
-              t('mr.decision'),
-              <span key="d">
-                {draft.proposals.length === 0 ? t('mr.decisionNone') : `${draft.proposals.length} ${t('mr.decisionSome')}`}
-              </span>,
-            ],
+            [t('mr.decision'), <span key="d">{draft.proposals.length === 0 ? t('mr.decisionNone') : `${draft.proposals.length} ${t('mr.decisionSome')}`}</span>],
           ].map(([label, body], i) => (
             <div key={i} className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[10rem_1fr] sm:gap-4">
               <dt className="font-bold text-ink">{label}</dt>
@@ -286,13 +260,11 @@ export default function MonthlyReport() {
               {rows.map((r) => {
                 const hasPrev = Number.isFinite(r.metric.previous);
                 return (
-                  <tr key={r.key} className="border-b border-line">
+                  <tr key={r.key} className="border-b border-line transition-colors hover:bg-surface-2">
                     <td className="px-3 py-3 font-bold text-ink">{(tr as Record<string, string>)[r.labelKey]}</td>
                     <td dir="ltr" className="px-3 py-3 text-end tabular-nums">{hasPrev ? fmt(r.metric.previous) : na}</td>
                     <td dir="ltr" className="px-3 py-3 text-end font-semibold tabular-nums">{fmt(r.metric.current)}</td>
-                    <td dir="ltr" className="px-3 py-3 text-end font-bold tabular-nums">
-                      {hasPrev ? pctText(pctChange(r.metric.current, r.metric.previous), na) : na}
-                    </td>
+                    <td dir="ltr" className="px-3 py-3 text-end font-bold tabular-nums">{hasPrev ? pctText(pctChange(r.metric.current, r.metric.previous), na) : na}</td>
                     <td className="px-3 py-3 text-end text-muted">{t('mr.targetNone')}</td>
                   </tr>
                 );
@@ -303,27 +275,16 @@ export default function MonthlyReport() {
       </Section>
 
       <Section title={t('mr.delivered')}>
+        {tx.loading && !tx.rows ? <p className="text-sm text-muted">…</p> : null}
         {delivered.map((d) => (
           <div key={d.p}>
             <Pill>{d.p}</Pill>
             <p className="mb-1 text-xs italic text-muted">{t('mr.deliveredLine')}</p>
             <ul className="space-y-1 ps-4 text-sm">
-              <li>
-                – {tr.income}: <span dir="ltr" className="font-semibold tabular-nums">{fmt(d.incNow)}</span> {pctText(pctChange(d.incNow, d.incPrev), na)} · {d.nInc}
-              </li>
-              <li>
-                – {tr.expenses}: <span dir="ltr" className="font-semibold tabular-nums">{fmt(d.expNow)}</span> · {d.nExp}
-              </li>
-              {d.topInc && (
-                <li>
-                  – {tr.income} / {d.topInc[0]}: <span dir="ltr" className="tabular-nums">{fmt(d.topInc[1])}</span>
-                </li>
-              )}
-              {d.topExp && (
-                <li>
-                  – {tr.expenses} / {d.topExp[0]}: <span dir="ltr" className="tabular-nums">{fmt(d.topExp[1])}</span>
-                </li>
-              )}
+              <li>– {tr.income}: <span dir="ltr" className="font-semibold tabular-nums">{fmt(d.incNow)}</span> {pctText(pctChange(d.incNow, d.incPrev), na)} · {d.nInc}</li>
+              <li>– {tr.expenses}: <span dir="ltr" className="font-semibold tabular-nums">{fmt(d.expNow)}</span> · {d.nExp}</li>
+              {d.topInc && <li>– {tr.income} / {d.topInc[0]}: <span dir="ltr" className="tabular-nums">{fmt(d.topInc[1])}</span></li>}
+              {d.topExp && <li>– {tr.expenses} / {d.topExp[0]}: <span dir="ltr" className="tabular-nums">{fmt(d.topExp[1])}</span></li>}
             </ul>
           </div>
         ))}
@@ -344,15 +305,11 @@ export default function MonthlyReport() {
               </thead>
               <tbody>
                 {carried.map((x) => (
-                  <tr key={x.id} className="border-b border-line">
+                  <tr key={x.id} className="border-b border-line transition-colors hover:bg-surface-2">
                     <td className="px-3 py-3 font-semibold text-ink">{lang === 'ar' ? x.descriptionAr : x.description}</td>
                     <td className="px-3 py-3 text-muted">{t('mr.ownerNone')}</td>
-                    <td className="px-3 py-3">
-                      {x.date ? <span dir="ltr" className="tabular-nums">{x.date}</span> : <span className="bg-warn px-2 py-0.5 text-xs font-bold text-black">{t('mr.noDate')}</span>}
-                    </td>
-                    <td className="px-3 py-3 text-muted">
-                      {statusLabel(x.status)} · <span dir="ltr" className="tabular-nums">{fmt(x.amount)}</span>
-                    </td>
+                    <td className="px-3 py-3">{x.date ? <span dir="ltr" className="tabular-nums">{x.date}</span> : <span className="bg-warn px-2 py-0.5 text-xs font-bold text-black">{t('mr.noDate')}</span>}</td>
+                    <td className="px-3 py-3 text-muted">{statusLabel(x.status)} · <span dir="ltr" className="tabular-nums">{fmt(x.amount)}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -397,7 +354,7 @@ export default function MonthlyReport() {
                 <tr key={label} className="border-b border-line">
                   <td className="px-3 py-2.5 font-semibold">{label}</td>
                   <td dir="ltr" className="px-3 py-2.5 text-start tabular-nums">{fmt(v)}</td>
-                  <td className="px-3 py-2.5 text-muted">{origin}</td>
+                  <td className="px-3 py-2.5 text-muted">{t('mr.originLive')}</td>
                 </tr>
               ))}
             </tbody>
@@ -420,12 +377,7 @@ export default function MonthlyReport() {
                 ).map(([k, label]) => (
                   <label key={k} className="block text-xs font-semibold text-muted">
                     {label}
-                    <input
-                      value={p[k]}
-                      onChange={(e) => patchProposal(p.id, { [k]: e.target.value })}
-                      aria-invalid={k === 'cost' && p.cost.trim() === ''}
-                      className={`${inputCls} mt-1 font-normal`}
-                    />
+                    <input value={p[k]} onChange={(e) => patchProposal(p.id, { [k]: e.target.value })} aria-invalid={k === 'cost' && p.cost.trim() === ''} className={`${inputCls} mt-1 font-normal`} />
                     {k === 'cost' && p.cost.trim() === '' && <span className="mt-1 block text-[11px] font-normal text-bad-ink">{t('mr.costRequired')}</span>}
                   </label>
                 ))}
@@ -433,11 +385,7 @@ export default function MonthlyReport() {
               <div className="mt-3 flex flex-wrap items-center gap-4 text-xs">
                 <label className="font-semibold text-muted">
                   {t('mr.priority')}{' '}
-                  <select
-                    value={p.priority}
-                    onChange={(e) => patchProposal(p.id, { priority: e.target.value as Proposal['priority'] })}
-                    className="ms-1 border border-line-strong bg-surface px-2 py-1 font-normal text-ink"
-                  >
+                  <select value={p.priority} onChange={(e) => patchProposal(p.id, { priority: e.target.value as Proposal['priority'] })} className="ms-1 border border-line-strong bg-surface px-2 py-1 font-normal text-ink">
                     {(['high', 'medium', 'low'] as const).map((v) => (
                       <option key={v} value={v}>{t(`mr.${v}`)}</option>
                     ))}
@@ -445,11 +393,7 @@ export default function MonthlyReport() {
                 </label>
                 {(['approve', 'decline'] as const).map((d) => (
                   <label key={d} className="flex items-center gap-1.5 text-ink">
-                    <input
-                      type="checkbox"
-                      checked={p.decision === d}
-                      onChange={() => patchProposal(p.id, { decision: p.decision === d ? '' : d })}
-                    />
+                    <input type="checkbox" checked={p.decision === d} onChange={() => patchProposal(p.id, { decision: p.decision === d ? '' : d })} />
                     {t(`mr.${d}`)}
                   </label>
                 ))}
@@ -460,7 +404,7 @@ export default function MonthlyReport() {
             </div>
           ))}
         </div>
-        <button type="button" onClick={addProposal} className="no-print mt-4 border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink hover:bg-surface-2">
+        <button type="button" onClick={addProposal} className="no-print mt-4 border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-surface-2">
           + {t('mr.addProposal')}
         </button>
       </Section>

@@ -33,7 +33,7 @@ export default function KpiCard({ title, metric, subtitle, language, sentimentTy
   const absText = `${metric.absoluteChange >= 0 ? '+' : ''}${formatCurrency(metric.absoluteChange, metric.currency)}`;
 
   return (
-    <div className="flex flex-col justify-between border border-line bg-surface p-5">
+    <div className="flex flex-col justify-between border border-line bg-surface p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-md">
       <div>
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">{title}</span>

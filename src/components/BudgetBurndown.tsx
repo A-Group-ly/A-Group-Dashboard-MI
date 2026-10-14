@@ -4,7 +4,6 @@ import React from 'react';
 import { Currency, Language } from '@/types/dashboard';
 import { translations } from '@/lib/translations';
 import { formatCurrency } from '@/lib/calculations';
-import { MONTHLY_BUDGET_CAP } from '@/lib/demoData';
 
 interface BudgetBurndownProps {
   currentExpenses: number;
@@ -13,7 +12,7 @@ interface BudgetBurndownProps {
   budgetOverrun: number;
   currency: Currency;
   language: Language;
-  /** Budget cap actually in force; falls back to the demo cap when not supplied. */
+  /** Budget cap for the selected period (prorated by the server). 0 / undefined = no budget set. */
   budgetCap?: number;
 }
 
@@ -27,7 +26,7 @@ export default function BudgetBurndown({
   budgetCap,
 }: BudgetBurndownProps) {
   const t = translations[language];
-  const cap = budgetCap && budgetCap > 0 ? budgetCap : MONTHLY_BUDGET_CAP[currency];
+  const cap = budgetCap && budgetCap > 0 ? budgetCap : 0;
   const rawPercent = cap > 0 ? (currentExpenses / cap) * 100 : 0;
   const usedPercent = Math.min(100, Math.round(rawPercent));
   const isOverrun = budgetOverrun > 0;

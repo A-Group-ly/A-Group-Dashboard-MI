@@ -27,7 +27,7 @@ export interface ApiTransaction {
   accountId: string | null;
 }
 
-const PLATFORM_BY_CODE: Record<string, PlatformSource> = {
+export const PLATFORM_BY_CODE: Record<string, PlatformSource> = {
   'A-STAY': 'A-Stay',
   'A-MARKET': 'A-Market',
   'A-SPACE': 'A-Space',

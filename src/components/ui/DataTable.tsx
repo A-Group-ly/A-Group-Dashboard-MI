@@ -182,7 +182,7 @@ export default function DataTable<T>({
               </tr>
             ) : (
               visible.map((row) => (
-                <tr key={rowKey(row)} className="border-b border-line hover:bg-surface-2">
+                <tr key={rowKey(row)} className="border-b border-line transition-colors duration-150 hover:bg-surface-2">
                   {columns.map((c) => (
                     <td key={c.key} className={`px-4 py-3 align-middle ${c.align === 'end' ? 'text-end' : 'text-start'}`}>
                       {c.render(row)}
@@ -206,7 +206,7 @@ export default function DataTable<T>({
               aria-label={t('f.prev')}
               disabled={current <= 1}
               onClick={() => setPage(current - 1)}
-              className="h-7 w-7 border border-line-strong bg-surface disabled:opacity-40"
+              className="h-7 w-7 border border-line-strong bg-surface transition-colors hover:bg-surface-2 disabled:opacity-40"
             >
               <span aria-hidden="true" className="rtl:hidden">‹</span>
               <span aria-hidden="true" className="hidden rtl:inline">›</span>
@@ -219,7 +219,7 @@ export default function DataTable<T>({
               aria-label={t('f.next')}
               disabled={current >= pages}
               onClick={() => setPage(current + 1)}
-              className="h-7 w-7 border border-line-strong bg-surface disabled:opacity-40"
+              className="h-7 w-7 border border-line-strong bg-surface transition-colors hover:bg-surface-2 disabled:opacity-40"
             >
               <span aria-hidden="true" className="rtl:hidden">›</span>
               <span aria-hidden="true" className="hidden rtl:inline">‹</span>

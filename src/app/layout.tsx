@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Hanken_Grotesk, IBM_Plex_Sans_Arabic, Montserrat } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { AppProvider } from "@/components/providers/AppProvider";
-import { DashboardDataProvider } from "@/components/providers/DashboardDataProvider";
-import AppShell from "@/components/shell/AppShell";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -30,7 +29,7 @@ export const metadata: Metadata = {
 };
 
 /** Applies saved theme / language before first paint to avoid a light-theme or LTR flash. */
-const PREFS_SCRIPT = `try{var p=JSON.parse(localStorage.getItem('ag_prefs_v1')||'{}');var r=document.documentElement;if(p.theme==='dark')r.classList.add('dark');if(p.lang==='ar'){r.lang='ar';r.dir='rtl'}}catch(e){}`;
+const PREFS_SCRIPT = `try{var p=JSON.parse(localStorage.getItem('ag_prefs_v2')||'{}');var r=document.documentElement;if(p.theme==='dark')r.classList.add('dark');if(p.lang==='ar'){r.lang='ar';r.dir='rtl'}}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -44,11 +43,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: PREFS_SCRIPT }} />
       </head>
       <body className="min-h-full">
-        <AppProvider>
-          <DashboardDataProvider>
-            <AppShell>{children}</AppShell>
-          </DashboardDataProvider>
-        </AppProvider>
+        <ClerkProvider>
+          <AppProvider>{children}</AppProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

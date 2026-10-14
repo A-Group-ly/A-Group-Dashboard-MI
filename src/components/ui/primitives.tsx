@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useApp } from '@/components/providers/AppProvider';
+import type { ApiState } from '@/components/providers/useApiData';
 
 /* ---------- Page header ---------- */
 
@@ -66,7 +67,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`mb-6 border border-line bg-surface ${className}`}>
+    <section className={`mb-6 border border-line bg-surface transition-colors duration-200 hover:border-line-strong ${className}`}>
       {title && (
         <header className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3">
           <h2 className="font-head text-sm font-bold text-ink">{title}</h2>
@@ -233,5 +234,38 @@ export function Select({
     <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={controlClass}>
       {children}
     </select>
+  );
+}
+
+/* ---------- Data gate: loading / error / content ---------- */
+
+function errorMessage(t: (k: string) => string, status: number | null): string {
+  if (status === 401) return t('err.unauthorized');
+  if (status === 403) return t('err.forbidden');
+  if (status === 404) return t('err.notFoundBody');
+  if (status === 0) return t('err.network');
+  return t('err.server');
+}
+
+/**
+ * Renders loading, error (with retry) and content for an API-backed view.
+ * If a refresh fails after data was loaded, the last valid data stays visible with a warning.
+ */
+export function ApiGate<T>({ state, children }: { state: ApiState<T>; children: (data: T) => React.ReactNode }) {
+  const { t } = useApp();
+  if (state.data === null && state.errorStatus !== null) {
+    return <ErrorState message={errorMessage(t, state.errorStatus)} onRetry={state.errorStatus === 401 || state.errorStatus === 403 || state.errorStatus === 404 ? undefined : state.retry} />;
+  }
+  if (state.data === null) return <PageSkeleton />;
+  return (
+    <>
+      {state.errorStatus !== null && (
+        <div role="status" className="mb-4 border border-warn bg-warn-soft px-4 py-2 text-xs text-warn-ink">
+          {t('ref.failed')} · {errorMessage(t, state.errorStatus)}
+          <button type="button" onClick={state.retry} className="ms-3 font-semibold underline">{t('act.retry')}</button>
+        </div>
+      )}
+      {children(state.data)}
+    </>
   );
 }

@@ -1,130 +1,77 @@
-import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { getMonthRangeUtc, isValidMonth } from '@/lib/month';
+import type { Prisma } from '@prisma/client';
+import { badRequest, guard, json, parseCurrency, parseRanges } from '@/lib/server/guard';
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
+export const dynamic = 'force-dynamic';
 
-    // Parse and validate query parameters
-    const month = searchParams.get('month'); // YYYY-MM format
-    const currency = searchParams.get('currency'); // LYD or USD
-    const status = searchParams.get('status'); // PAID, PENDING, UPCOMING
-    const category = searchParams.get('category');
-    const platformId = searchParams.get('platformId');
-    const paymentMethod = searchParams.get('paymentMethod');
-    const rawPage = parseInt(searchParams.get('page') || '1', 10);
-    const rawLimit = parseInt(searchParams.get('limit') || '50', 10);
-    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
-    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 50;
-    const skip = (page - 1) * limit;
+const STATUSES = ['PAID', 'PENDING', 'UPCOMING'] as const;
+const METHODS = ['CASH', 'LOCAL_CARD', 'INTERNATIONAL_CARD', 'BANK_TRANSFER', 'DIGITAL_WALLET', 'OTHER', 'NOT_APPLICABLE'] as const;
 
-    // Build where clause
-    const where: Record<string, unknown> = {};
+export const GET = guard('transactions:view', async (req, access, prisma) => {
+  const sp = new URL(req.url).searchParams;
 
-    if (month) {
-      if (!isValidMonth(month)) {
-        return NextResponse.json(
-          { error: 'Invalid month. Use YYYY-MM format' },
-          { status: 400 }
-        );
-      }
-      const { start, end } = getMonthRangeUtc(month);
-      where.transactionDate = { gte: start, lte: end };
-    }
+  const where: Prisma.FinancialTransactionWhereInput = { organizationId: access.organizationId };
 
-    if (currency && ['LYD', 'USD'].includes(currency)) {
-      where.currency = currency;
-    }
-
-    if (status && ['PAID', 'PENDING', 'UPCOMING'].includes(status)) {
-      where.status = status;
-    }
-
-    if (category) {
-      where.category = category;
-    }
-
-    if (platformId) {
-      where.platformId = platformId;
-    }
-
-    if (paymentMethod && ['CASH', 'LOCAL_CARD', 'INTERNATIONAL_CARD', 'BANK_TRANSFER', 'DIGITAL_WALLET', 'OTHER', 'NOT_APPLICABLE'].includes(paymentMethod)) {
-      where.paymentMethod = paymentMethod;
-    }
-
-    // Execute queries
-    const [transactions, total] = await Promise.all([
-      prisma.financialTransaction.findMany({
-        where,
-        include: {
-          platform: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-            },
-          },
-          account: {
-            select: {
-              id: true,
-              name: true,
-              type: true,
-              currency: true,
-            },
-          },
-        },
-        orderBy: { transactionDate: 'desc' },
-        skip,
-        take: limit,
-      }),
-      prisma.financialTransaction.count({ where }),
-    ]);
-
-    // Convert Decimal to number for JSON serialization
-    const serializedTransactions = transactions.map((tx: {
-      id: string;
-      description: string;
-      descriptionAr: string | null;
-      amount: { toNumber: () => number } | number;
-      currency: string;
-      type: string;
-      status: string;
-      category: string;
-      categoryAr: string | null;
-      transactionDate: Date;
-      dueDate: Date | null;
-      reference: string | null;
-      platformId: string | null;
-      platform: { id: string; name: string; code: string } | null;
-      paymentMethod: string;
-      paymentProvider: string | null;
-      accountId: string | null;
-      account: { id: string; name: string; type: string; currency: string } | null;
-      externalReference: string | null;
-      createdAt: Date;
-      updatedAt: Date;
-    }) => ({
-      ...tx,
-      amount: typeof tx.amount === 'number' ? tx.amount : tx.amount.toNumber(),
-    }));
-
-    return NextResponse.json({
-      data: serializedTransactions,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    // Let Next.js's own prerender bail-out signal through; it is not a failure.
-    if ((error as { digest?: string })?.digest === 'NEXT_PRERENDER_INTERRUPTED') throw error;
-    console.error('Transactions API error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch transactions' },
-      { status: 500 }
-    );
+  if (sp.get('from') || sp.get('to')) {
+    const ranges = parseRanges(sp);
+    if (!ranges) return badRequest('Invalid period. Use from/to as YYYY-MM-DD');
+    where.transactionDate = { gte: new Date(`${ranges.range.from}T00:00:00Z`), lte: new Date(`${ranges.range.to}T00:00:00Z`) };
   }
-}
+
+  const currencyParam = sp.get('currency');
+  if (currencyParam) {
+    const currency = parseCurrency(currencyParam);
+    if (!currency) return badRequest('Invalid currency. Must be LYD or USD');
+    where.currency = currency;
+  }
+
+  const status = sp.get('status');
+  if (status) {
+    if (!(STATUSES as readonly string[]).includes(status)) return badRequest('Invalid status');
+    where.status = status as (typeof STATUSES)[number];
+  }
+  const method = sp.get('paymentMethod');
+  if (method) {
+    if (!(METHODS as readonly string[]).includes(method)) return badRequest('Invalid payment method');
+    where.paymentMethod = method as (typeof METHODS)[number];
+  }
+  const category = sp.get('category');
+  if (category) where.category = category;
+
+  const rawPage = parseInt(sp.get('page') || '1', 10);
+  const rawLimit = parseInt(sp.get('limit') || '50', 10);
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
+
+  const [rows, total] = await Promise.all([
+    prisma.financialTransaction.findMany({
+      where,
+      select: {
+        id: true,
+        description: true,
+        descriptionAr: true,
+        amount: true,
+        currency: true,
+        type: true,
+        status: true,
+        category: true,
+        categoryAr: true,
+        transactionDate: true,
+        paymentMethod: true,
+        paymentProvider: true,
+        externalReference: true,
+        accountId: true,
+        platform: { select: { id: true, name: true, code: true } },
+        account: { select: { id: true, name: true, type: true, currency: true } },
+      },
+      orderBy: [{ transactionDate: 'desc' }, { id: 'asc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.financialTransaction.count({ where }),
+  ]);
+
+  return json({
+    data: rows.map((r) => ({ ...r, amount: Number(r.amount.toString()) })),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  });
+});

@@ -1,7 +1,7 @@
 /**
  * FICTIONAL DEMO DATA for organizations, customers, plans, subscriptions, invoices and payments.
- * Ported from the Z.ai reference design. Not stored in the database; no real customer data,
- * no payment processing. Replace with Prisma-backed queries once the Category 2 models exist.
+ * Source for prisma/seed.ts only (the app reads everything from the database). No real customer data,
+ * no payment processing.
  *
  * Dates are fixed (no `Date.now()`), rebased so that "today" is DEMO_TODAY.
  */
@@ -252,74 +252,3 @@ export const PAYMENTS: Payment[] = [
   { id: 'pay_x01', invoiceId: 'inv_017', invoiceNumber: 'INV-2026-0017', customerId: 'cus_003', date: S('2025-10-05'), amount: 2200, currency: 'LYD', method: 'Card on file (simulated)', status: 'failed' },
   { id: 'pay_x02', invoiceId: 'inv_020', invoiceNumber: 'INV-2026-0020', customerId: 'cus_002', date: S('2025-11-18'), amount: 950, currency: 'LYD', method: 'Bank transfer (simulated)', status: 'pending' },
 ];
-
-/* ---- lookups ---- */
-export const customerById = (id: string) => CUSTOMERS.find((c) => c.id === id);
-export const orgById = (id: string | null) => (id ? ORGS.find((o) => o.id === id) : undefined);
-export const planById = (id: string) => PLANS.find((p) => p.id === id);
-export const productById = (id: string) => PRODUCTS.find((p) => p.id === id);
-export const subscriptionById = (id: string) => SUBSCRIPTIONS.find((s) => s.id === id);
-
-/* ---- calculations (demo-only; will move server-side with the real models) ---- */
-export function monthlyNormalized(price: number, interval: Interval): number {
-  if (interval === 'quarterly') return price / 3;
-  if (interval === 'yearly') return price / 12;
-  if (interval === 'weekly') return (price * 52) / 12; // 52 weeks / 12 months
-  return price;
-}
-
-/** MRR per currency from ACTIVE subscriptions only. Currencies are never combined. */
-export function mrrByCurrency(): Record<Cur, number> {
-  const out: Record<Cur, number> = { LYD: 0, USD: 0 };
-  for (const s of SUBSCRIPTIONS) {
-    if (s.status !== 'active') continue;
-    const p = planById(s.planId);
-    if (p) out[p.currency] += monthlyNormalized(p.price, p.interval);
-  }
-  return out;
-}
-
-export function invoiceBalance(inv: Invoice): number | null {
-  if (inv.status === 'paid') return 0;
-  if (inv.status === 'draft' || inv.status === 'void') return null;
-  return inv.total;
-}
-
-function daysBetween(fromIso: string, toIso: string): number {
-  return Math.round((Date.parse(`${toIso}T00:00:00Z`) - Date.parse(`${fromIso}T00:00:00Z`)) / 86400000);
-}
-
-export type AgingBucket = 'notDue' | 'd30' | 'd60' | 'd90' | 'd90p';
-
-/** Outstanding invoice totals per bucket and currency (issued = not yet due; overdue = past due date). */
-export function agingBuckets(): Record<AgingBucket, Record<Cur, number>> {
-  const zero = (): Record<Cur, number> => ({ LYD: 0, USD: 0 });
-  const out: Record<AgingBucket, Record<Cur, number>> = { notDue: zero(), d30: zero(), d60: zero(), d90: zero(), d90p: zero() };
-  for (const inv of INVOICES) {
-    if (inv.status !== 'issued' && inv.status !== 'overdue') continue;
-    const late = daysBetween(inv.dueDate, DEMO_TODAY);
-    const bucket: AgingBucket = late <= 0 ? 'notDue' : late <= 30 ? 'd30' : late <= 60 ? 'd60' : late <= 90 ? 'd90' : 'd90p';
-    out[bucket][inv.currency] += inv.total;
-  }
-  return out;
-}
-
-export function invoicedAndCollected(): Record<Cur, { invoiced: number; collected: number; outstanding: number }> {
-  const out: Record<Cur, { invoiced: number; collected: number; outstanding: number }> = {
-    LYD: { invoiced: 0, collected: 0, outstanding: 0 },
-    USD: { invoiced: 0, collected: 0, outstanding: 0 },
-  };
-  for (const inv of INVOICES) {
-    if (inv.status === 'draft' || inv.status === 'void') continue;
-    out[inv.currency].invoiced += inv.total;
-    if (inv.status === 'issued' || inv.status === 'overdue') out[inv.currency].outstanding += inv.total;
-  }
-  for (const p of PAYMENTS) {
-    if (p.status === 'succeeded') out[p.currency].collected += p.amount; // pending / failed are NOT collections
-  }
-  return out;
-}
-
-export function daysUntil(iso: string): number {
-  return daysBetween(DEMO_TODAY, iso);
-}
