@@ -6,23 +6,41 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "postinstall": "prisma generate",
+    "typecheck": "tsc --noEmit",
+    "demo:validate": "node scripts/demo-validate.mjs",
+    "demo:scale": "ts-node --project prisma/tsconfig.seed.json prisma/seed-demo-scale.ts",
+    "build:cf": "opennextjs-cloudflare build",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "secrets:put": "bash scripts/put-secrets.sh"
   },
   "dependencies": {
+    "@clerk/nextjs": "7.9.15",
+    "@neondatabase/serverless": "0.10.4",
+    "@prisma/adapter-neon": "5.22.0",
     "@prisma/client": "^5.22.0",
-    "next": "16.4.0",
+    "next": "16.3.8",
     "prisma": "^5.22.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.11",
     "@tailwindcss/turbopack": "^4",
-    "@types/node": "^20",
+    "@types/node": "^20.19.43",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.0",
+    "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "ts-node": "^10.9.2",
+    "typescript": "^5",
+    "wrangler": "4.151.0"
+  },
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma\\seed.ts"
   }
 }

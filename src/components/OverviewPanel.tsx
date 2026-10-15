@@ -1,0 +1,90 @@
+'use client';
+
+import React from 'react';
+import { useApp } from '@/components/providers/AppProvider';
+import { useDashboardData } from '@/components/providers/DashboardDataProvider';
+import { PageSkeleton } from '@/components/ui/primitives';
+import KpiCard from '@/components/KpiCard';
+import BudgetBurndown from '@/components/BudgetBurndown';
+import PaymentChannelBreakdown from '@/components/PaymentChannelBreakdown';
+import ComparisonBars from '@/components/charts/ComparisonBars';
+import ChartsSection from '@/components/charts/ChartsSection';
+import FinancialPosition from '@/components/FinancialPosition';
+
+/**
+ * Everything for ONE currency (the enclosing <CurrencyScope>). The overview renders two of these side by
+ * side: USD on the left, LYD on the right. Amounts are never combined across currencies.
+ */
+export default function OverviewPanel() {
+  const { currency, lang, dir, hidden, tr: t, t: ui } = useApp();
+  const show = (k: string) => !hidden.includes(k as never);
+  const { data } = useDashboardData();
+  if (!data) return <PageSkeleton />;
+  const o = data.overview;
+  const name = ui(currency === 'USD' ? 'cur.usd' : 'cur.lyd');
+  const budgetSubtitle = !data.meta.budgetConfigured ? ui('budget.none') : o.budgetOverrun > 0 ? t.budgetOverrunLabel : data.meta.budgetProrated ? ui('budget.prorated') : t.allocatedCap;
+
+  return (
+    <section aria-label={`${currency} — ${name}`} dir={dir} className="@container min-w-0">
+      <header className="mb-4 flex items-baseline justify-between gap-3 border-b-2 border-ink pb-2">
+        <h2 dir="ltr" className="font-head text-xl font-bold tracking-wide text-ink">{currency}</h2>
+        <span className="text-xs font-semibold text-muted">{name}</span>
+      </header>
+
+      {show('position') && <FinancialPosition position={data.position} spending={data.spending} />}
+
+      {show('kpis') && <h3 className="mb-3 font-head text-sm font-bold text-ink">{ui('kpi.title')}</h3>}
+      {show('kpis') && <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
+        <KpiCard title={t.kpiIncome} metric={o.totalIncome} subtitle={t.vsLastMonth} language={lang} sentimentType="income" />
+        <KpiCard title={t.kpiExpenses} metric={o.totalExpenses} subtitle={t.vsLastMonth} language={lang} sentimentType="expense" />
+        <KpiCard title={t.kpiNetResult} metric={o.netResult} subtitle={t.vsLastMonth} language={lang} sentimentType="net" />
+        <KpiCard title={t.kpiAvailableCash} metric={o.availableCash} subtitle={t.illustrativeEstimate} language={lang} sentimentType="neutral" />
+        <KpiCard title={t.kpiRemainingBudget} metric={o.remainingBudget} subtitle={budgetSubtitle} language={lang} sentimentType={o.budgetOverrun > 0 ? 'expense' : 'neutral'} />
+        <KpiCard title={t.kpiCustomerCollections} metric={o.customerCollections} subtitle={t.collectedFromCustomers} language={lang} sentimentType="income" />
+        <KpiCard title={t.kpiCashCollected} metric={o.cashCollected} subtitle={t.actualReceived} language={lang} sentimentType="income" />
+        <KpiCard
+          title={t.kpiPendingIncome}
+          metric={{ current: o.pendingIncomeTotal, previous: 0, absoluteChange: 0, percentageChange: null, isIncrease: false, currency }}
+          subtitle={t.notYetCollected}
+          language={lang}
+          sentimentType="neutral"
+        />
+      </div>}
+
+      {show('charts') && (
+        <div className="mt-6">
+          <ChartsSection data={data} />
+        </div>
+      )}
+
+      <div className="mt-6 space-y-6">
+        {show('channels') && <PaymentChannelBreakdown incomeBreakdown={o.incomeByPaymentMethod} expensesBreakdown={o.expensesByPaymentMethod} currency={currency} language={lang} />}
+        {show('budget') && <BudgetBurndown
+          currentExpenses={o.totalExpenses.current}
+          remainingBudget={o.remainingBudget.current}
+          upcomingTotal={o.upcomingObligationsTotal}
+          budgetOverrun={o.budgetOverrun}
+          currency={currency}
+          language={lang}
+          budgetCap={data.meta.budgetCap}
+        />}
+        {show('comparisons') && <ComparisonBars
+          title={ui('cmp.incByPlatform')}
+          items={data.breakdown.incomeByPlatform.map((b) => ({ key: b.key, label: lang === 'ar' ? b.labelAr : b.label, current: b.current, previous: b.previous }))}
+          currency={currency}
+          increaseIs="good"
+          currentLabel={ui('cmp.current')}
+          previousLabel={ui('cmp.previous')}
+        />}
+        {show('comparisons') && <ComparisonBars
+          title={ui('cmp.expByCategory')}
+          items={data.breakdown.expensesByCategory.map((b) => ({ key: b.key, label: lang === 'ar' ? b.labelAr : b.label, current: b.current, previous: b.previous }))}
+          currency={currency}
+          increaseIs="bad"
+          currentLabel={ui('cmp.current')}
+          previousLabel={ui('cmp.previous')}
+        />}
+      </div>
+    </section>
+  );
+}

@@ -4,7 +4,6 @@ import React from 'react';
 import { Currency, Language } from '@/types/dashboard';
 import { translations } from '@/lib/translations';
 import { formatCurrency } from '@/lib/calculations';
-import { MONTHLY_BUDGET_CAP } from '@/lib/demoData';
 
 interface BudgetBurndownProps {
   currentExpenses: number;
@@ -13,6 +12,8 @@ interface BudgetBurndownProps {
   budgetOverrun: number;
   currency: Currency;
   language: Language;
+  /** Budget cap for the selected period (prorated by the server). 0 / undefined = no budget set. */
+  budgetCap?: number;
 }
 
 export default function BudgetBurndown({
@@ -22,71 +23,69 @@ export default function BudgetBurndown({
   budgetOverrun,
   currency,
   language,
+  budgetCap,
 }: BudgetBurndownProps) {
   const t = translations[language];
-  const cap = MONTHLY_BUDGET_CAP[currency];
-  const usedPercent = Math.min(100, Math.round((currentExpenses / cap) * 100));
+  const cap = budgetCap && budgetCap > 0 ? budgetCap : 0;
+  const rawPercent = cap > 0 ? (currentExpenses / cap) * 100 : 0;
+  const usedPercent = Math.min(100, Math.round(rawPercent));
   const isOverrun = budgetOverrun > 0;
+  const near = !isOverrun && rawPercent >= 80;
+
+  const barTone = isOverrun ? 'bg-bad' : near ? 'bg-warn' : 'bg-ink';
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+    <section className="flex h-full flex-col justify-between border border-line bg-surface p-5" aria-labelledby="budget-title">
       <div>
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">
+        <h3 id="budget-title" className="mb-1 font-head text-sm font-bold text-ink">
           {t.budgetTitle}
         </h3>
-        <p className="text-xs text-slate-500 mb-4">{t.allocatedCap}</p>
+        <p className="mb-4 text-xs text-muted">{t.allocatedCap}</p>
 
-        {/* Progress Bar */}
         <div className="space-y-2">
-          <div className="flex justify-between text-xs font-mono">
-            <span className="text-slate-500">{t.budgetUsed}: {usedPercent}%</span>
-            <span className="font-bold text-slate-900 dark:text-white">
+          <div className="flex flex-wrap justify-between gap-2 text-xs">
+            <span className="text-muted">
+              {t.budgetUsed}: <span className="tabular-nums">{rawPercent.toFixed(0)}%</span>
+            </span>
+            <span dir="ltr" className="font-semibold tabular-nums text-ink">
               {formatCurrency(currentExpenses, currency)} / {formatCurrency(cap, currency)}
             </span>
           </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-500 ${
-                isOverrun ? 'bg-rose-500' : usedPercent > 85 ? 'bg-amber-500' : 'bg-indigo-600'
-              }`}
-              style={{ width: `${Math.min(usedPercent, 100)}%` }}
-            />
+          <div
+            className="h-2.5 w-full bg-surface-2"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={usedPercent}
+            aria-label={t.budgetUsed}
+          >
+            <div className={`h-full ${barTone}`} style={{ width: `${usedPercent}%` }} />
           </div>
         </div>
 
-        {/* Remaining Budget display */}
-        <div className="mt-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase">
-            {t.kpiRemainingBudget}
-          </div>
-          <div className={`text-lg font-bold font-mono ${isOverrun ? 'text-rose-600 dark:text-rose-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+        <div className="mt-4 border border-line bg-surface-2 p-3">
+          <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">{t.kpiRemainingBudget}</div>
+          <div dir="ltr" className={`text-lg font-bold tabular-nums ${isOverrun ? 'text-bad-ink' : 'text-ink'}`}>
             {formatCurrency(remainingBudget, currency)}
           </div>
           {isOverrun && (
-            <div className="text-[11px] text-rose-600 dark:text-rose-400 mt-1">
-              {t.budgetOverrunLabel}: {formatCurrency(budgetOverrun, currency)}
+            <div className="mt-1 text-[11px] font-semibold text-bad-ink">
+              {t.budgetOverrunLabel}: <span dir="ltr" className="tabular-nums">{formatCurrency(budgetOverrun, currency)}</span>
             </div>
           )}
+          {near && <div className="mt-1 text-[11px] font-semibold text-warn-ink">≥ 80%</div>}
         </div>
       </div>
 
-      {/* Upcoming Obligations Notice */}
-      <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
-            <div>
-              <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                {t.upcomingObligations}
-              </div>
-              <div className="text-[11px] text-slate-400">{t.dueSoon}</div>
-            </div>
-          </div>
-          <div className="text-sm font-mono font-bold text-amber-600 dark:text-amber-400">
-            {formatCurrency(upcomingTotal, currency)}
-          </div>
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-line pt-4">
+        <div>
+          <div className="text-xs font-bold text-ink">{t.upcomingObligations}</div>
+          <div className="text-[11px] text-muted">{t.dueSoon}</div>
+        </div>
+        <div dir="ltr" className="text-sm font-bold tabular-nums text-ink">
+          {formatCurrency(upcomingTotal, currency)}
         </div>
       </div>
-    </div>
+    </section>
   );
 }

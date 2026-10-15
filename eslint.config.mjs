@@ -10,8 +10,11 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
+    ".open-next/**",
+    ".wrangler/**",
     "build/**",
     "next-env.d.ts",
+    "test-financial-calculations.js",
   ]),
 ]);
 
