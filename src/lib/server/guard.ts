@@ -33,7 +33,14 @@ export function guard<P = Record<string, never>>(
       if (permission && !can(result.access.role, permission)) return json({ error: 'Forbidden' }, 403);
 
       prisma = getPrisma();
-      return await handler(req, result.access, prisma, ctx);
+      try {
+        return await handler(req, result.access, prisma, ctx);
+      } catch (first) {
+        // A sleeping free-tier database or a cold Worker can fail the very first query. Reads are safe to repeat once.
+        if (req.method !== 'GET' || (first as { digest?: string })?.digest) throw first;
+        await new Promise((r) => setTimeout(r, 400));
+        return await handler(req, result.access, prisma, ctx);
+      }
     } catch (e) {
       // Let Next.js's own control-flow signals through (e.g. prerender bail-out).
       if ((e as { digest?: string })?.digest) throw e;

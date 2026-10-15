@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useDashboardData } from './DashboardDataProvider';
+import { fetchRetry } from '@/lib/fetchRetry';
 
 export interface ApiState<T> {
   data: T | null;
@@ -32,7 +33,7 @@ export function useApiData<T>(url: string | null): ApiState<T> {
     const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mark loading for the new request
     setState((s) => ({ ...s, loading: s.url !== url || s.data === null, errorStatus: null }));
-    fetch(url, { signal: controller.signal, cache: 'no-store' })
+    fetchRetry(url, { signal: controller.signal, cache: 'no-store' })
       .then(async (res) => {
         if (!res.ok) throw Object.assign(new Error('http'), { status: res.status });
         const body = (await res.json()) as T;

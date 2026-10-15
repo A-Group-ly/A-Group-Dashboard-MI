@@ -6,6 +6,7 @@ import type { BreakdownItem, PlatformSummary, SeriesPoint } from '@/lib/server/f
 import type { Range } from '@/lib/period';
 import { useApp, useCurrencyScope } from './AppProvider';
 import { PLATFORM_BY_CODE } from '@/lib/mapApi';
+import { fetchRetry } from '@/lib/fetchRetry';
 import type { Currency } from '@/types/dashboard';
 
 export type DataStatus = 'loading' | 'refreshing' | 'ok' | 'error';
@@ -133,7 +134,7 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
         prevTo: previous.to,
       });
       if (platformCode) qs.set('platform', platformCode);
-      const res = await fetch(`/api/overview?${qs}`, { signal: controller.signal, cache: 'no-store' });
+      const res = await fetchRetry(`/api/overview?${qs}`, { signal: controller.signal, cache: 'no-store' });
       if (!res.ok) throw new HttpError(res.status);
       const body = await res.json();
       if (id !== requestId.current) return;

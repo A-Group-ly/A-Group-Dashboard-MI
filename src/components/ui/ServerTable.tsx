@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '@/components/providers/AppProvider';
 import { useAccess } from '@/components/providers/AccessProvider';
 import { useToast } from '@/components/providers/ToastProvider';
+import { fetchRetry } from '@/lib/fetchRetry';
 import { useDashboardData } from '@/components/providers/DashboardDataProvider';
 import { controlClass, EmptyState, ErrorState } from './primitives';
 
@@ -134,7 +135,7 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
     for (const [k, v] of Object.entries(JSON.parse(extraKey) as Record<string, string>)) qs.set(k, v);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mark the request as loading
     setLoading(true);
-    fetch(`${endpoint}?${qs}`, { signal: controller.signal, cache: 'no-store' })
+    fetchRetry(`${endpoint}?${qs}`, { signal: controller.signal, cache: 'no-store' })
       .then(async (res) => {
         if (!res.ok) throw Object.assign(new Error('http'), { status: res.status });
         setResp((await res.json()) as R);

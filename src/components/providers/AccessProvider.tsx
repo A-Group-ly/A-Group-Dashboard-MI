@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { can as canRole, type Permission, type Role } from '@/lib/permissions';
+import { fetchRetry } from '@/lib/fetchRetry';
 
 export interface Me {
   name: string | null;
@@ -30,7 +31,7 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const c = new AbortController();
-    fetch('/api/me', { signal: c.signal, cache: 'no-store' })
+    fetchRetry('/api/me', { signal: c.signal, cache: 'no-store' })
       .then(async (res) => {
         if (!res.ok) throw Object.assign(new Error('http'), { status: res.status });
         setState({ me: (await res.json()) as Me, loading: false, errorStatus: null });

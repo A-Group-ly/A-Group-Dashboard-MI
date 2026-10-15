@@ -338,3 +338,43 @@ test('write permissions: analysts and read-only never write; finance writes data
   assert.equal(permissionForPath('/invoices'), 'invoices:view');
   assert.equal(permissionForPath('/audit'), 'audit:view');
 });
+
+/* ---------------- transient-failure retry ---------------- */
+
+import { fetchRetry } from '../src/lib/fetchRetry.ts';
+
+test('fetchRetry retries 5xx and network errors but never 4xx', async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    let calls = 0;
+    globalThis.fetch = async () => (++calls < 3 ? new Response('x', { status: 500 }) : new Response('ok', { status: 200 }));
+    assert.equal((await fetchRetry('/x')).status, 200);
+    assert.equal(calls, 3);
+
+    calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      return new Response('no', { status: 403 });
+    };
+    assert.equal((await fetchRetry('/x')).status, 403);
+    assert.equal(calls, 1);
+
+    calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      if (calls === 1) throw new TypeError('network');
+      return new Response('ok', { status: 200 });
+    };
+    assert.equal((await fetchRetry('/x')).status, 200);
+
+    calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      return new Response('down', { status: 503 });
+    };
+    assert.equal((await fetchRetry('/x', {}, 1)).status, 503); // gives up with the real answer
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

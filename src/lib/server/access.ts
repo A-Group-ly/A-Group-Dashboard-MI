@@ -20,7 +20,7 @@ export type AccessResult =
   | { status: 'unauthenticated' }
   | { status: 'forbidden'; reason: 'inactive' | 'no-membership' };
 
-async function ensureLocalUser(prisma: PrismaClient, clerkUserId: string) {
+async function ensureLocalUserOnce(prisma: PrismaClient, clerkUserId: string) {
   const existing = await prisma.user.findUnique({
     where: { clerkUserId },
     include: { memberships: { where: { organizationId: TENANT_ORG_ID }, take: 1 } },
@@ -48,6 +48,24 @@ async function ensureLocalUser(prisma: PrismaClient, clerkUserId: string) {
     create: { userId: user.id, organizationId: TENANT_ORG_ID, role: admins === 0 ? 'ADMIN' : 'READ_ONLY' },
   });
   return { user, membership };
+}
+
+/**
+ * The first page load fires several API calls at once; on a brand-new account each one tries to create the same
+ * local user / membership. The database's unique keys let exactly one win, so the others (P2002) simply read the
+ * rows the winner created.
+ */
+async function ensureLocalUser(prisma: PrismaClient, clerkUserId: string) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await ensureLocalUserOnce(prisma, clerkUserId);
+    } catch (e) {
+      const code = (e as { code?: string })?.code;
+      if (code !== 'P2002' && code !== 'P2034') throw e;
+      await new Promise((r) => setTimeout(r, 120 * (attempt + 1)));
+    }
+  }
+  return ensureLocalUserOnce(prisma, clerkUserId);
 }
 
 /** Resolve who is calling and what they may do. Fails closed. Memoised per request. */
