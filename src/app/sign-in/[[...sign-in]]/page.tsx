@@ -1,4 +1,5 @@
 import { SignIn } from "@clerk/nextjs";
+import Link from "next/link";
 import Logo from "@/components/Logo";
 
 export const metadata = { title: "Sign in — A-Group" };
@@ -18,6 +19,12 @@ export default function SignInPage() {
             variables: { colorPrimary: "#f05e49", borderRadius: "4px", fontFamily: "var(--font-hanken), system-ui, sans-serif" },
           }}
         />
+        <p className="text-center text-sm text-header-ink/80">
+          New here?{" "}
+          <Link href="/sign-up" className="font-semibold text-accent underline underline-offset-4 hover:text-white">
+            Create an account
+          </Link>
+        </p>
         <p className="text-center text-xs text-header-ink/50">Demo environment · fictional data</p>
       </div>
     </main>
