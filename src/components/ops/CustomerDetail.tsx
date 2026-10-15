@@ -145,7 +145,7 @@ export default function CustomerDetail({ id }: { id: string }) {
                   <Fact label={t('col.created')}><span dir="ltr" className="tabular-nums">{c.createdAt}</span></Fact>
                   <Fact label={t('cust.totalInv')}>{totals.length ? totals.map((x) => <div key={x.cur}><Money value={x.invoiced} currency={x.cur} /></div>) : '—'}</Fact>
                   <Fact label={t('cust.totalPaid')}>{totals.length ? totals.map((x) => <div key={x.cur}><Money value={x.collected} currency={x.cur} /></div>) : '—'}</Fact>
-                  <div className="sm:col-span-2 lg:col-span-3"><Fact label={t('col.notes')}><span dir="auto">{c.notes ?? '—'}</span></Fact></div>
+                  <div className="sm:col-span-2 lg:col-span-3"><Fact label={t('col.notes')}>{c.notes ? c.notes.split('\n').map((line, i) => <div key={i} dir="auto" className="break-words">{line}</div>) : '—'}</Fact></div>
                 </dl>
               </Card>
             )}

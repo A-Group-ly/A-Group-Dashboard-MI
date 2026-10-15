@@ -21,7 +21,7 @@ type Slide = (typeof SLIDES)[number];
 /** Big number that can be blurred for shared-screen safety. */
 function Big({ value, hide, tone = '' }: { value: string; hide: boolean; tone?: string }) {
   return (
-    <div dir="ltr" className={`text-start font-head text-[clamp(1.75rem,4.2vw,6rem)] font-bold leading-none tabular-nums tracking-tight transition-[filter] duration-200 rtl:text-end ${tone || 'text-ink'} ${hide ? 'select-none blur-md' : ''}`}>
+    <div dir="ltr" className={`whitespace-nowrap text-start font-head text-[clamp(1.25rem,9cqw,6rem)] font-bold leading-none tabular-nums tracking-tight transition-[filter] duration-200 rtl:text-end ${tone || 'text-ink'} ${hide ? 'select-none blur-md' : ''}`}>
       {value}
     </div>
   );
@@ -29,7 +29,7 @@ function Big({ value, hide, tone = '' }: { value: string; hide: boolean; tone?: 
 
 function Stat({ label, value, hide, tone }: { label: string; value: string; hide: boolean; tone?: string }) {
   return (
-    <div className="border-s-[0.35vw] border-accent ps-[1.2vw]">
+    <div className="min-w-0 border-s-[0.35vw] border-accent ps-[1.2vw] [container-type:inline-size]">
       <div className="text-[clamp(0.7rem,1.05vw,1.4rem)] font-bold uppercase tracking-[0.1em] text-muted">{label}</div>
       <Big value={value} hide={hide} tone={tone} />
     </div>
@@ -78,7 +78,7 @@ function SlideBody({ slide, data, hide, chartHeight }: { slide: Slide; data: Ove
   if (slide === 'trend') {
     const pts = data.series.points;
     return (
-      <div className={hide ? 'blur-md' : ''}>
+      <div className={`min-w-0 ${hide ? 'blur-md' : ''}`}>
         <LineChart
           labels={pts.map((x) => shortDate(x.start, lang, data.series.bucket))}
           series={[
@@ -89,7 +89,7 @@ function SlideBody({ slide, data, hide, chartHeight }: { slide: Slide; data: Ove
           ariaLabel={`${t('chart.trend')} — ${currency}`}
           height={chartHeight}
         />
-        <div className="mt-6 grid grid-cols-2 gap-6">
+        <div className="mt-6 grid grid-cols-2 gap-[clamp(1rem,2vw,3rem)] [&>*]:min-w-0">
           <Stat label={t('tx.income')} value={fmt(o.totalIncome.current)} hide={hide} />
           <Stat label={t('tx.expense')} value={fmt(o.totalExpenses.current)} hide={hide} />
         </div>
@@ -179,7 +179,7 @@ export default function TvPage() {
   const title = { position: t('pos.title'), spending: t('pos.spendTitle'), trend: t('chart.trend'), pulse: t('pulse.title') }[slide];
 
   return (
-    <main className="flex min-h-dvh flex-col bg-bg p-4 text-ink sm:p-6 2xl:p-10" aria-label={t('tv.title')}>
+    <main className="flex min-h-dvh flex-col overflow-x-hidden bg-bg p-4 text-ink sm:p-6 2xl:p-10" aria-label={t('tv.title')}>
       <header className="mb-6 flex flex-wrap items-center gap-4">
         <Logo className="h-10 w-10 text-ink" />
         <div className="min-w-0">
@@ -210,7 +210,7 @@ export default function TvPage() {
         <section dir="ltr" aria-live="polite" className="grid grid-cols-1 gap-[clamp(2rem,5vw,6rem)] lg:grid-cols-2">
           {(['USD', 'LYD'] as const).map((c) => (
             <CurrencyScope key={c} currency={c}>
-              <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-w-0">
+              <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-w-0 overflow-hidden">
                 <div className="mb-5 flex items-baseline justify-between border-b-2 border-ink pb-2">
                   <span dir="ltr" className="font-head text-[clamp(1.25rem,2.2vw,3rem)] font-bold">{c}</span>
                   <span className="text-[clamp(0.8rem,1.1vw,1.5rem)] font-semibold text-muted">{t(c === 'USD' ? 'cur.usd' : 'cur.lyd')}</span>

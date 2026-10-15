@@ -274,8 +274,8 @@ const SECTORS: { en: string; ar: string; industry: string }[] = [
 ];
 const BIZ_SUFFIX: Record<'SMALL_BUSINESS' | 'MEDIUM_BUSINESS' | 'ENTERPRISE', { en: string[]; ar: string[] }> = {
   SMALL_BUSINESS: { en: ['Est.', 'Shop', 'Co.'], ar: ['مؤسسة', 'محل', 'شركة'] },
-  MEDIUM_BUSINESS: { en: ['Company', 'Co. Ltd', 'Services'], ar: ['شركة', 'شركة', 'خدمات'] },
-  ENTERPRISE: { en: ['Group', 'Holding', 'Industries'], ar: ['مجموعة', 'القابضة', 'للصناعات'] },
+  MEDIUM_BUSINESS: { en: ['Company', 'Co. Ltd', 'Services'], ar: ['شركة', 'شركة', 'مركز'] },
+  ENTERPRISE: { en: ['Group', 'Holding', 'Industries'], ar: ['مجموعة', 'مجموعة', 'مجموعة'] },
 };
 
 const CITIES = ['Tripoli', 'Benghazi', 'Misrata', 'Sabha', 'Zawiya', 'Bayda', 'Derna'] as const;
@@ -696,7 +696,8 @@ function buildCustomer(
     city,
     country: 'Libya',
     status,
-    notes: `Synthetic demo record - fictional. الاسم بالعربية: ${displayAr}`,
+    // Two lines: the English label and the Arabic name never share a line, so neither can scramble the other's direction.
+    notes: `Synthetic demo record - fictional.\nالاسم بالعربية: ${displayAr}`,
     createdAt,
   };
 }

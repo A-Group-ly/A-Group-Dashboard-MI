@@ -10,13 +10,14 @@
  * URL or any credential; never truncates tables; never touches rows that are not part of this dataset.
  * Run the base seed first (npx prisma db seed): this script needs the tenant, platforms, accounts and catalog.
  */
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { PLANS } from '../src/lib/subscriptionDemo';
 import { generateScaleDataset, validateScaleDataset, TENANT_ORG_ID } from './demo/generate';
 
 const args = new Set(process.argv.slice(2));
 const confirm = args.has('--confirm');
 const reset = args.has('--reset-demo');
+const refreshText = args.has('--refresh-text');
 
 if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PRODUCTION_SEED !== 'true') {
   console.error('Refusing to run: NODE_ENV=production and ALLOW_PRODUCTION_SEED is not "true".');
@@ -53,6 +54,21 @@ async function main() {
 
   if (!confirm) {
     console.log('\nDRY RUN: nothing was written. Re-run with --confirm to write this dataset (additive and idempotent).');
+    return;
+  }
+
+  if (refreshText) {
+    // Updates ONLY the notes of this dataset's customers (ids cust-demo-*) to the current generator text.
+    const rows = ds.customers;
+    let updated = 0;
+    for (let i = 0; i < rows.length; i += 400) {
+      const chunk = rows.slice(i, i + 400);
+      updated += await prisma.$executeRaw`
+        UPDATE "Customer" AS c SET "notes" = v."notes"
+        FROM (VALUES ${Prisma.join(chunk.map((r) => Prisma.sql`(${r.id}, ${r.notes})`))}) AS v("id", "notes")
+        WHERE c."id" = v."id" AND c."organizationId" = ${TENANT_ORG_ID} AND c."notes" IS DISTINCT FROM v."notes"`;
+    }
+    console.log(`Customer notes refreshed: ${updated} rows changed (${rows.length - updated} already up to date).`);
     return;
   }
 
