@@ -198,6 +198,7 @@ export default function CommandPalette({ openSignal }: { openSignal: number }) {
             ['Ctrl / ⌘ + K', t('kbd.search')],
             ['/', t('kbd.search')],
             ['?', t('kbd.help')],
+            ['[', t('kbd.sidebar')],
             ['g  o', t('nav.overview')],
             ['g  c', t('nav.customers')],
             ['g  s', t('nav.subscriptions')],

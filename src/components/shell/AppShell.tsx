@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useApp } from '@/components/providers/AppProvider';
@@ -54,6 +54,57 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [searchSignal, setSearchSignal] = useState(0);
+  // Desktop sidebar can be collapsed (remembered in this browser). Phones keep the slide-over menu.
+  const [collapsed, setCollapsed] = useState(false);
+  const [desktop, setDesktop] = useState(true);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restore the saved layout after mount (storage is client-only)
+      setCollapsed(window.localStorage.getItem('ag_sidebar') === 'closed');
+    } catch {
+      /* storage unavailable: stays open */
+    }
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const sync = () => setDesktop(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    // Enable transitions only after the first paint so the saved state never animates on page load.
+    const id = window.requestAnimationFrame(() => setReady(true));
+    return () => {
+      mq.removeEventListener('change', sync);
+      window.cancelAnimationFrame(id);
+    };
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    if (window.matchMedia('(min-width: 1024px)').matches) {
+      setCollapsed((c) => {
+        const next = !c;
+        try {
+          window.localStorage.setItem('ag_sidebar', next ? 'closed' : 'open');
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    } else {
+      setOpen((o) => !o);
+    }
+  }, []);
+
+  // "[" toggles the sidebar (when not typing).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (e.key === '[' && !e.ctrlKey && !e.metaKey && !e.altKey && !(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable))) toggleSidebar();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [toggleSidebar]);
+
+  const sidebarVisible = desktop ? !collapsed : open;
 
   // Browser tab title follows the page (helps when several tabs are open).
   useEffect(() => {
@@ -80,10 +131,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {open && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setOpen(false)} aria-hidden="true" />}
 
       <aside
+        id="main-nav"
         aria-label="Main"
-        className={`fixed inset-y-0 start-0 z-40 flex w-60 flex-col border-e border-line bg-surface transition-transform lg:translate-x-0 lg:rtl:translate-x-0 ${
-          open ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
-        }`}
+        inert={!sidebarVisible}
+        className={`fixed inset-y-0 start-0 z-40 flex w-60 flex-col border-e border-line bg-surface ${ready ? 'transition-transform duration-200 ease-out' : ''} ${
+          sidebarVisible ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
+        } ${collapsed ? 'lg:-translate-x-full lg:rtl:translate-x-full' : 'lg:translate-x-0 lg:rtl:translate-x-0'}`}
       >
         <div className="flex items-center gap-3 border-b border-line px-5 py-4">
           <Logo className="h-9 w-9 shrink-0 text-ink" />
@@ -91,8 +144,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div dir="ltr" className="text-start font-head text-sm font-bold tracking-wide">{t('app.name')}</div>
             <div className="text-[10px] uppercase leading-tight tracking-[0.14em] text-muted">{t('app.sub')}</div>
           </div>
-          <button type="button" className="ms-auto text-muted transition-colors hover:text-ink lg:hidden" onClick={() => setOpen(false)} aria-label={t('shell.closeMenu')}>
-            ✕
+          <button type="button" className="ms-auto text-muted transition-colors hover:text-ink" onClick={toggleSidebar} aria-label={t('shell.closeMenu')} title={`${t('shell.closeMenu')} ([)`}>
+            <span className="lg:hidden" aria-hidden="true">✕</span>
+            <span className="hidden lg:inline rtl:rotate-180" aria-hidden="true">«</span>
           </button>
         </div>
 
@@ -129,10 +183,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="border-t border-line px-5 py-3 text-[11px] text-muted">{t('shell.footer')}</div>
       </aside>
 
-      <div className="lg:ps-60">
+      <div className={`${ready ? 'transition-[padding] duration-200 ease-out' : ''} ${collapsed ? 'lg:ps-0' : 'lg:ps-60'}`}>
         <header className="sticky top-0 z-20 border-b border-header-line bg-header text-header-ink">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 lg:px-6">
-            <button type="button" className={`${hdrBtn} lg:hidden`} onClick={() => setOpen(true)} aria-label={t('shell.menu')} aria-expanded={open}>
+            <button type="button" className={hdrBtn} onClick={toggleSidebar} aria-label={t('shell.menu')} title={`${t('shell.menu')} ([)`} aria-expanded={sidebarVisible} aria-controls="main-nav">
               ☰
             </button>
 
