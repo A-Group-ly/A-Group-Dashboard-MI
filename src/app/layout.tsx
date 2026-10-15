@@ -1,25 +1,33 @@
 import type { Metadata } from "next";
-import { Hanken_Grotesk, IBM_Plex_Sans_Arabic, Montserrat } from "next/font/google";
+import localFont from "next/font/local";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { AppProvider } from "@/components/providers/AppProvider";
 
-const montserrat = Montserrat({
+// Self-hosted (npm @fontsource packages): the build never needs to reach Google Fonts, so CI and deploys are reliable.
+const montserrat = localFont({
   variable: "--font-montserrat",
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  src: "../../node_modules/@fontsource-variable/montserrat/files/montserrat-latin-wght-normal.woff2",
+  weight: "100 900",
+  display: "swap",
 });
 
-const hanken = Hanken_Grotesk({
+const hanken = localFont({
   variable: "--font-hanken",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  src: "../../node_modules/@fontsource-variable/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2",
+  weight: "100 900",
+  display: "swap",
 });
 
-const plexArabic = IBM_Plex_Sans_Arabic({
+const plexArabic = localFont({
   variable: "--font-arabic",
-  subsets: ["arabic"],
-  weight: ["400", "500", "600", "700"],
+  src: [
+    { path: "../../node_modules/@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../../node_modules/@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../../node_modules/@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../../node_modules/@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-700-normal.woff2", weight: "700", style: "normal" },
+  ],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
