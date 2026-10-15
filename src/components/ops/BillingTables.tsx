@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { useApp } from '@/components/providers/AppProvider';
 import { Money, StatusBadge } from '@/components/ui/primitives';
 import DataTable, { type Column } from '@/components/ui/DataTable';
@@ -28,7 +29,7 @@ export interface PaymentRowUi {
 export function InvoiceTable({ invoices }: { invoices: InvoiceRow[] }) {
   const { t } = useApp();
   const columns: Column<InvoiceRow>[] = [
-    { key: 'number', header: t('col.invoice'), sort: (i) => i.number, render: (i) => <span dir="ltr" className="font-semibold tabular-nums">{i.number}</span> },
+    { key: 'number', header: t('col.invoice'), sort: (i) => i.number, render: (i) => <Link href={`/invoices/${i.id}`} dir="ltr" className="font-semibold tabular-nums transition-colors hover:text-accent-strong">{i.number}</Link> },
     { key: 'issue', header: t('col.issue'), sort: (i) => i.issueDate, render: (i) => <span dir="ltr" className="tabular-nums text-muted">{i.issueDate}</span> },
     { key: 'due', header: t('col.due'), sort: (i) => i.dueDate, render: (i) => <span dir="ltr" className="tabular-nums text-muted">{i.dueDate}</span> },
     { key: 'total', header: t('col.total'), align: 'end', sort: (i) => i.total, render: (i) => <Money value={i.total} currency={i.currency} /> },

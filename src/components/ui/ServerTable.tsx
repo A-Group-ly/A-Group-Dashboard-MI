@@ -53,6 +53,8 @@ interface Props<T, R extends Page<T>> {
   emptyAction?: React.ReactNode;
   /** Where a click on a row goes (links, buttons and copy targets inside the row keep their own behaviour). */
   rowHref?: (row: T) => string | null;
+  /** Adds row checkboxes. The bar is shown while something is selected (selection is per page and clears when the data changes). */
+  bulkActions?: (selected: T[], clear: () => void) => React.ReactNode;
 }
 
 /**
@@ -74,7 +76,9 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
   toolbarEnd,
   emptyAction,
   rowHref,
+  bulkActions,
 }: Props<T, R>) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const router = useRouter();
   const { t } = useApp();
   const { version } = useDashboardData();
@@ -140,6 +144,7 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
     for (const [k, v] of Object.entries(JSON.parse(extraKey) as Record<string, string>)) qs.set(k, v);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mark the request as loading
     setLoading(true);
+    setSelected(new Set());
     fetchRetry(`${endpoint}?${qs}`, { signal: controller.signal, cache: 'no-store' })
       .then(async (res) => {
         if (!res.ok) throw Object.assign(new Error('http'), { status: res.status });
@@ -232,10 +237,32 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
         </div>
       )}
 
+      {bulkActions && selected.size > 0 && resp && (
+        <div role="region" aria-label={t('bulk.title')} className="flex flex-wrap items-center gap-3 border-b border-accent bg-accent-soft px-4 py-2.5 text-sm">
+          <span className="font-semibold text-ink"><span dir="ltr" className="tabular-nums">{selected.size}</span> {t('bulk.selected')}</span>
+          <div className="flex flex-wrap items-center gap-2">{bulkActions(resp.data.filter((r) => selected.has(rowKey(r))), () => setSelected(new Set()))}</div>
+          <button type="button" onClick={() => setSelected(new Set())} className="ms-auto text-xs font-semibold text-accent-strong hover:underline">{t('bulk.clear')}</button>
+        </div>
+      )}
+
       <div className={`overflow-x-auto transition-opacity duration-150 ${loading && resp ? 'opacity-60' : ''}`} aria-busy={loading}>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b-2 border-ink">
+              {bulkActions && (
+                <th scope="col" className="w-10 px-4 py-2.5">
+                  <input
+                    type="checkbox"
+                    aria-label={t('bulk.selectPage')}
+                    checked={!!resp && resp.data.length > 0 && resp.data.every((r) => selected.has(rowKey(r)))}
+                    ref={(el) => {
+                      if (el && resp) el.indeterminate = selected.size > 0 && !resp.data.every((r) => selected.has(rowKey(r)));
+                    }}
+                    onChange={(e) => setSelected(e.target.checked && resp ? new Set(resp.data.map(rowKey)) : new Set())}
+                    className="h-4 w-4 accent-[var(--accent)]"
+                  />
+                </th>
+              )}
               {columns.map((c) => {
                 const isSorted = c.sortKey !== undefined && sort.key === c.sortKey;
                 return (
@@ -262,12 +289,12 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
             {resp === null ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i} className="border-b border-line">
-                  <td colSpan={columns.length} className="px-4 py-3"><div className="skeleton h-5" /></td>
+                  <td colSpan={columns.length + (bulkActions ? 1 : 0)} className="px-4 py-3"><div className="skeleton h-5" /></td>
                 </tr>
               ))
             ) : resp.data.length === 0 ? (
               <tr>
-                <td colSpan={columns.length}>
+                <td colSpan={columns.length + (bulkActions ? 1 : 0)}>
                   <EmptyState title={t('f.noResults')} body={emptyBody} />
                   {!hasActive && total === 0 && emptyAction && <div className="-mt-4 pb-8 text-center">{emptyAction}</div>}
                 </td>
@@ -284,6 +311,24 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
                   }}
                   className="border-b border-line transition-colors duration-150 hover:bg-surface-2"
                 >
+                  {bulkActions && (
+                    <td className="w-10 px-4 py-3 align-middle">
+                      <input
+                        type="checkbox"
+                        aria-label={t('bulk.selectRow')}
+                        checked={selected.has(rowKey(row))}
+                        onChange={(e) =>
+                          setSelected((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(rowKey(row));
+                            else next.delete(rowKey(row));
+                            return next;
+                          })
+                        }
+                        className="h-4 w-4 accent-[var(--accent)]"
+                      />
+                    </td>
+                  )}
                   {columns.map((c) => (
                     <td key={c.key} className={`px-4 py-3 align-middle ${c.align === 'end' ? 'text-end' : 'text-start'}`}>{c.render(row)}</td>
                   ))}

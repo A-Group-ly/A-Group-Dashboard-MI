@@ -258,3 +258,9 @@ tr[data-rowlink] { cursor: pointer; }
 tr[data-rowlink]:hover td { background-color: var(--accent-soft); }
 tr[data-rowlink]:active td { background-color: var(--surface-2); }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+@media print {
+  .print-doc { border: 0 !important; box-shadow: none !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
+  .print-doc * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  [role="status"][aria-live], .toast { display: none !important; }
+}

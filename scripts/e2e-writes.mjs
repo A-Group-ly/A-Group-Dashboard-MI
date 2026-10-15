@@ -115,6 +115,33 @@ try {
   r = await call('GET', '/api/search?q=a');
   expect('global search ignores 1-character queries', r.json.customers.length, 0);
 
+  // bulk invoice actions + printable invoice data
+  const bulkIds = [];
+  const bulkNumbers = [];
+  for (let k = 0; k < 3; k++) {
+    r = await call('POST', '/api/invoices', { customerId: cust, currency: 'LYD', amount: String(100 + k), issueDate: '2026-10-0' + (k + 1) });
+    expect(`bulk setup invoice ${k + 1}`, r.status, 201);
+    created.invoices.push(r.json.id);
+    bulkIds.push(r.json.id);
+    bulkNumbers.push(r.json.number);
+  }
+  r = await call('POST', '/api/invoices/bulk', { action: 'pay', method: 'cash', ids: bulkIds.slice(0, 2) });
+  expect('bulk pay: both succeed', r.json?.succeeded, 2);
+  r = await call('POST', '/api/invoices/bulk', { action: 'pay', method: 'cash', ids: bulkIds.slice(0, 2) });
+  expect('bulk pay again: both refused (no double payment)', r.json?.failed, 2);
+  r = await call('POST', '/api/invoices/bulk', { action: 'void', ids: [bulkIds[2], bulkIds[0]] });
+  expect('bulk void: open one voided, paid one refused', [r.json?.succeeded, r.json?.failed].join('/'), '1/1');
+  r = await call('POST', '/api/invoices/bulk', { action: 'pay', method: 'cash', ids: Array.from({ length: 11 }, (_, i) => 'x' + i) });
+  expect('bulk: more than 10 ids rejected', r.status, 422);
+  r = await call('POST', '/api/invoices/bulk', { action: 'explode', ids: ['a'] });
+  expect('bulk: unknown action rejected', r.status, 422);
+  const paidTx = await prisma.financialTransaction.count({ where: { reference: { in: bulkNumbers.slice(0, 2) }, type: 'INCOME' } });
+  expect('bulk pay booked one income transaction per invoice', paidTx, 2);
+  r = await call('GET', `/api/invoices/${bulkIds[0]}`);
+  expect('invoice document data', r.status === 200 && r.json.invoice.status === 'paid' && r.json.payments.length === 1 && r.json.customer.id === cust, true);
+  r = await call('GET', '/api/invoices/does-not-exist');
+  expect('unknown invoice is 404', r.status, 404);
+
   // reads
   r = await call('GET', '/api/audit?pageSize=5');
   expect('audit log readable', r.status, 200);
@@ -130,7 +157,7 @@ try {
   // Remove everything this script created (children first). The audit rows of this run are removed too.
   const subs = created.subs;
   await prisma.billingPayment.deleteMany({ where: { invoice: { OR: [{ id: { in: created.invoices } }] } } });
-  await prisma.financialTransaction.deleteMany({ where: { OR: [{ id: { in: created.txs } }, { category: 'ZZ Test' }] } });
+  await prisma.financialTransaction.deleteMany({ where: { OR: [{ id: { in: created.txs } }, { category: 'ZZ Test' }, { reference: { in: (await prisma.invoice.findMany({ where: { id: { in: created.invoices } }, select: { number: true } })).map((i) => i.number) } }] } });
   await prisma.invoice.deleteMany({ where: { id: { in: created.invoices } } });
   await prisma.subscription.deleteMany({ where: { id: { in: subs } } });
   await prisma.customer.deleteMany({ where: { id: { in: created.customers } } });

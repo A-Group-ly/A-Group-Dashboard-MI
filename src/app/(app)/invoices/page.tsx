@@ -9,6 +9,7 @@ import ServerTable, { type SCol, type SFilter } from '@/components/ui/ServerTabl
 import { Button, apiSend, useErrorText } from '@/components/ui/forms';
 import { useToast } from '@/components/providers/ToastProvider';
 import Copyable from '@/components/ui/Copyable';
+import BulkInvoiceBar from '@/components/ops/BulkInvoiceBar';
 import { NewInvoiceDialog, RecordPaymentDialog, VoidInvoiceDialog, type InvoiceLite } from '@/components/ops/BillingDialogs';
 
 interface InvRow extends InvoiceLite {
@@ -55,6 +56,7 @@ export default function InvoicesPage() {
     { key: 'paid', header: t('col.paid'), render: (i) => <span dir="ltr" className="tabular-nums text-muted">{i.paidDate ?? '—'}</span> },
     { key: 'status', header: t('col.status'), sortKey: 'status', render: (i) => <StatusBadge status={i.status} /> },
   ];
+  columns.push({ key: 'view', header: '', align: 'end', render: (i) => <Link href={`/invoices/${i.id}`} className="text-xs font-semibold text-accent-strong hover:underline">{t('act.view')}</Link> });
   if (canPay || canWrite) {
     columns.push({
       key: 'actions',
@@ -89,7 +91,8 @@ export default function InvoicesPage() {
           pageSize={25}
           searchPlaceholder={t('inv.searchPh')}
           reloadKey={reload}
-          rowHref={(i) => `/customers/${i.customerId}`}
+          rowHref={(i) => `/invoices/${i.id}`}
+          bulkActions={canPay || canWrite ? (selected, clear) => <BulkInvoiceBar rows={selected} canPay={canPay} canWrite={canWrite} onDone={bump} clear={clear} /> : undefined}
           emptyAction={can('invoices:write') ? <Button onClick={() => setCreating(true)}>+ {t('inv.add')}</Button> : undefined}
           exportFilename="a-group-invoices.csv"
           toolbarEnd={canWrite ? <Button onClick={() => setCreating(true)}>+ {t('inv.add')}</Button> : null}

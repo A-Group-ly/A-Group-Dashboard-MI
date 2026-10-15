@@ -7,6 +7,7 @@ import { useAccess } from '@/components/providers/AccessProvider';
 import { ROUTE_PERMISSION, type Permission } from '@/lib/permissions';
 import { formatCurrency } from '@/lib/calculations';
 import { Modal } from '@/components/ui/forms';
+import { clearRecent, getRecent, type RecentItem } from '@/lib/recent';
 
 interface Item {
   key: string;
@@ -55,6 +56,7 @@ export default function CommandPalette({ openSignal }: { openSignal: number }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<SearchResults | null>(null);
   const [active, setActive] = useState(0);
+  const [recent, setRecent] = useState<RecentItem[]>([]);
   const gPending = useRef(0);
 
   const allowed = useMemo(() => PAGES.filter((p) => can((ROUTE_PERMISSION[p.href] ?? 'dashboard:view') as Permission)), [can]);
@@ -69,6 +71,12 @@ export default function CommandPalette({ openSignal }: { openSignal: number }) {
   );
 
   // Open from the header button.
+  // Reload the list every time the palette opens (pages add to it while you browse).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read the browser-only list when the dialog opens
+    if (open) setRecent(getRecent());
+  }, [open]);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the header button asks the palette to open
     if (openSignal > 0) setOpen(true);
@@ -131,8 +139,13 @@ export default function CommandPalette({ openSignal }: { openSignal: number }) {
       for (const s of results.subscriptions) out.push({ key: `s:${s.id}`, group: t('nav.subscriptions'), label: `${s.id} · ${s.customer}`, hint: `${s.plan} · ${t(`status.${s.status}`)}`, href: `/subscriptions/${s.id}` });
       for (const i of results.invoices) out.push({ key: `i:${i.id}`, group: t('nav.invoices'), label: `${i.number} · ${i.customer}`, hint: `${formatCurrency(i.total, i.currency)} · ${t(`status.${i.status}`)}`, href: `/customers/${i.customerId}` });
     }
-    return [...out, ...pages];
-  }, [q, results, allowed, t]);
+    const recents: Item[] = needle
+      ? []
+      : recent
+          .filter((r) => r.kind !== 'invoice' || can('invoices:view'))
+          .map((r) => ({ key: `r:${r.href}`, group: t('cmd.recent'), label: r.label, hint: t(`cmd.kind.${r.kind}`), href: r.href }));
+    return [...recents, ...out, ...pages];
+  }, [q, results, allowed, t, recent, can]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the highlighted row in range as results change
@@ -189,7 +202,21 @@ export default function CommandPalette({ openSignal }: { openSignal: number }) {
             );
           })}
         </ul>
-        <p className="mt-3 border-t border-line pt-2 text-[11px] text-muted">{t('cmd.hint')}</p>
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-2 text-[11px] text-muted">
+          <span>{t('cmd.hint')}</span>
+          {recent.length > 0 && !q.trim() && (
+            <button
+              type="button"
+              onClick={() => {
+                clearRecent();
+                setRecent([]);
+              }}
+              className="shrink-0 font-semibold text-accent-strong hover:underline"
+            >
+              {t('cmd.clearRecent')}
+            </button>
+          )}
+        </div>
       </Modal>
 
       <Modal open={help} title={t('kbd.title')} onClose={() => setHelp(false)}>

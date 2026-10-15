@@ -35,7 +35,9 @@ Global search (Ctrl/Cmd+K or `/`) over customers, subscriptions, invoices and pa
 wallboard with auto refresh, hide-amounts privacy toggle and full screen); saved views (period + platform); customizable
 overview (show/hide sections); compact/comfortable density; rows-per-page selector; copy buttons for ids, emails and
 invoice numbers; customer health badge, lifetime summary and activity timeline; simulated payment reminders for overdue
-invoices (recorded in the audit log, nothing is sent); empty-state call-to-action buttons.
+invoices (recorded in the audit log, nothing is sent); empty-state call-to-action buttons; a "recently viewed" list in the search box; **bulk actions** on invoices (record
+payments, simulated reminders, void for many invoices at once, in safe batches); a **printable invoice** page (`/invoices/<id>`,
+Print / Save as PDF); a collapsible sidebar (`[`).
 
 ## Roles
 

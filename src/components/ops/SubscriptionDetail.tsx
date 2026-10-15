@@ -6,6 +6,7 @@ import { useApp } from '@/components/providers/AppProvider';
 import { useApiData } from '@/components/providers/useApiData';
 import { useAccess } from '@/components/providers/AccessProvider';
 import { Button } from '@/components/ui/forms';
+import TrackRecent from '@/components/TrackRecent';
 import { NewInvoiceDialog, SubscriptionActionDialog, type SubAction } from './BillingDialogs';
 import { ApiGate, Card, DemoNotice, EmptyState, Money, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import { InvoiceTable, PaymentTable, type InvoiceRow, type PaymentRowUi } from './BillingTables';
@@ -47,6 +48,7 @@ export default function SubscriptionDetail({ id }: { id: string }) {
 
         return (
           <>
+            <TrackRecent kind="subscription" href={`/subscriptions/${s.id}`} label={`${s.id} · ${s.customerName}`} />
             <PageHeader
               title={`${t('sub.detail')} · ${s.id}`}
               subtitle={`${s.customerName} — ${s.productName} / ${s.planName}`}

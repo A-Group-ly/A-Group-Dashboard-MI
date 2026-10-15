@@ -10,6 +10,7 @@ import { CustomerDialog, CustomerStatusDialog } from './CustomerDialogs';
 import { NewInvoiceDialog, NewSubscriptionDialog } from './BillingDialogs';
 import Copyable from '@/components/ui/Copyable';
 import { Badge } from '@/components/ui/primitives';
+import TrackRecent from '@/components/TrackRecent';
 import { ApiGate, Card, DemoNotice, EmptyState, Money, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import DataTable, { type Column } from '@/components/ui/DataTable';
 import { InvoiceTable, PaymentTable, type InvoiceRow, type PaymentRowUi } from './BillingTables';
@@ -91,6 +92,7 @@ export default function CustomerDetail({ id }: { id: string }) {
 
         return (
           <>
+            <TrackRecent kind="customer" href={`/customers/${c.id}`} label={c.displayName} />
             <PageHeader
               title={c.displayName}
               subtitle={`${t(`type.${c.type}`)} · ${c.city}, ${c.country}`}
