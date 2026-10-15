@@ -25,7 +25,8 @@ issue and void invoices, record **simulated** payments (books the matching incom
 delete transactions, set monthly budgets, activate / deactivate users, CSV export of customers / subscriptions /
 invoices / transactions (server-side, same filters as the table), server-side search / filter / sort / pagination for
 large lists, an admin **audit log** of every change, toast feedback and validated forms (English / Arabic).
-USD and LYD are always shown side by side (USD left, LYD right) and never combined.
+USD and LYD are shown side by side (USD left, LYD right) and never combined; a **Both / USD / LYD** toggle shows one currency
+at full width. Period, platform and saved views live in one **Filters** panel; table filters open from a Filters button too.
 
 ## Quality-of-life features
 

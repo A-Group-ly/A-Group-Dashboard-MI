@@ -54,7 +54,7 @@ const emptyForm = (today: string) => ({
 type Form = ReturnType<typeof emptyForm>;
 
 export default function TransactionsPanel() {
-  const { t, lang, range, platform } = useApp();
+  const { t, lang, range, platform, currencyView } = useApp();
   const { can } = useAccess();
   const canWrite = can('transactions:write');
   const [reload, setReload] = useState(0);
@@ -95,8 +95,9 @@ export default function TransactionsPanel() {
   const extra = useMemo(() => {
     const e: Record<string, string> = { from: range.from, to: range.to };
     if (platform !== 'all' && CODE_BY_PLATFORM[platform]) e.platform = CODE_BY_PLATFORM[platform];
+    if (currencyView !== 'both') e.currency = currencyView;
     return e;
-  }, [range.from, range.to, platform]);
+  }, [range.from, range.to, platform, currencyView]);
 
   const pm = (m: string) => METHOD_LABEL[m]?.[lang] ?? m;
   const statusLabel = (s: string) => t(`status.${s.toLowerCase()}`);
@@ -150,14 +151,14 @@ export default function TransactionsPanel() {
 
   const filters = useCallback(
     (resp: Resp | null): SFilter[] => [
-      { key: 'currency', label: t('tx.currency'), options: [{ v: 'USD', l: 'USD' }, { v: 'LYD', l: 'LYD' }] },
+      ...(currencyView === 'both' ? [{ key: 'currency', label: t('tx.currency'), options: [{ v: 'USD', l: 'USD' }, { v: 'LYD', l: 'LYD' }] }] : []),
       { key: 'type', label: t('tx.type'), options: [{ v: 'income', l: t('tx.income') }, { v: 'expense', l: t('tx.expense') }] },
       { key: 'status', label: t('tx.status'), options: ['PAID', 'PENDING', 'UPCOMING'].map((v) => ({ v, l: statusLabel(v) })) },
       { key: 'category', label: t('tx.category'), options: (resp?.facets.categories ?? []).map((v) => ({ v, l: v })) },
       { key: 'paymentMethod', label: t('tx.paymentMethod'), options: METHODS.map((v) => ({ v, l: pm(v) })) },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps -- label helpers only depend on the language
-    [lang]
+    [lang, currencyView]
   );
 
   const renderForm = (v: Form, set: (k: keyof Form, value: string) => void, errors: Record<string, string>) => {

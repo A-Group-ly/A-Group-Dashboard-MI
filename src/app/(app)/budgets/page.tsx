@@ -44,7 +44,7 @@ function BudgetsPanel({ tab }: { tab: 'cash' | 'trend' }) {
         <span className="text-xs font-semibold text-muted">{t(currency === 'USD' ? 'cur.usd' : 'cur.lyd')}</span>
       </header>
 
-      {tab === 'cash' && <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
+      {tab === 'cash' && <div className="grid grid-cols-1 gap-4 @md:grid-cols-2 @3xl:grid-cols-3">
         <KpiCard title={tr.kpiAvailableCash} metric={o.availableCash} subtitle={tr.illustrativeEstimate} language={lang} sentimentType="neutral" />
         <KpiCard
           title={tr.kpiRemainingBudget}
@@ -114,7 +114,7 @@ function BudgetList({ onEdit, reload }: { onEdit: (b: { month: string; currency:
 }
 
 export default function BudgetsPage() {
-  const { t, tr } = useApp();
+  const { t, tr, currencyView } = useApp();
   const { can } = useAccess();
   const { all, loading, error, refresh } = useDashboardData();
   const [dialog, setDialog] = useState<null | { month: string; currency: string; amount: number } | 'new'>(null);
@@ -143,9 +143,9 @@ export default function BudgetsPage() {
       {tab === 'list' ? (
         <BudgetList reload={reload} onEdit={(b) => setDialog(b)} />
       ) : (
-        <div dir="ltr" className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <CurrencyScope currency="USD"><BudgetsPanel tab={tab} /></CurrencyScope>
-          <CurrencyScope currency="LYD"><BudgetsPanel tab={tab} /></CurrencyScope>
+        <div dir="ltr" className={`grid grid-cols-1 gap-6 ${currencyView === 'both' ? 'xl:grid-cols-2' : ''}`}>
+          {currencyView !== 'LYD' && <CurrencyScope currency="USD"><BudgetsPanel tab={tab} /></CurrencyScope>}
+          {currencyView !== 'USD' && <CurrencyScope currency="LYD"><BudgetsPanel tab={tab} /></CurrencyScope>}
         </div>
       )}
       <BudgetDialog

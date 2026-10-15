@@ -9,7 +9,7 @@ import { formatCurrency } from '@/lib/calculations';
 
 /** Headline counters: customers, subscriptions and monthly recurring revenue (each currency on its own). */
 export default function PulseStrip() {
-  const { t } = useApp();
+  const { t, currencyView } = useApp();
   const { pulse } = useDashboardData();
   const { can } = useAccess();
   if (!pulse) return null;
@@ -40,15 +40,19 @@ export default function PulseStrip() {
         ))}
         <div className={`${card} col-span-2`}>
           <span className={label}>{t('pulse.mrr')}</span>
-          <div className="mt-1 grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-[10px] font-semibold text-muted">USD</div>
-              <div dir="ltr" className="text-xl font-bold tabular-nums text-ink">{formatCurrency(pulse.mrr.USD, 'USD')}</div>
-            </div>
-            <div>
-              <div className="text-[10px] font-semibold text-muted">LYD</div>
-              <div dir="ltr" className="text-xl font-bold tabular-nums text-ink">{formatCurrency(pulse.mrr.LYD, 'LYD')}</div>
-            </div>
+          <div className={`mt-1 grid gap-3 ${currencyView === 'both' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {currencyView !== 'LYD' && (
+              <div>
+                <div className="text-[10px] font-semibold text-muted">USD</div>
+                <div dir="ltr" className="text-xl font-bold tabular-nums text-ink">{formatCurrency(pulse.mrr.USD, 'USD')}</div>
+              </div>
+            )}
+            {currencyView !== 'USD' && (
+              <div>
+                <div className="text-[10px] font-semibold text-muted">LYD</div>
+                <div dir="ltr" className="text-xl font-bold tabular-nums text-ink">{formatCurrency(pulse.mrr.LYD, 'LYD')}</div>
+              </div>
+            )}
           </div>
           <div className="mt-1 text-[11px] text-muted">{t('pulse.mrrHint')}</div>
         </div>

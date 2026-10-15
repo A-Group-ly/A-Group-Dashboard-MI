@@ -20,6 +20,8 @@ export type Theme = 'light' | 'dark';
 export const REFRESH_OPTIONS = [0, 30, 60, 120, 300] as const;
 
 export type Density = 'comfortable' | 'compact';
+/** Which currencies the dashboard shows: both side by side, or one on its own (never combined). */
+export type CurrencyView = 'both' | 'USD' | 'LYD';
 export const SECTIONS = ['pulse', 'position', 'kpis', 'charts', 'channels', 'budget', 'comparisons', 'actions', 'recent'] as const;
 export type SectionKey = (typeof SECTIONS)[number];
 
@@ -34,6 +36,7 @@ interface Prefs {
   lang: Language;
   theme: Theme;
   density: Density;
+  currencyView: CurrencyView;
   /** Overview sections the user chose to hide. */
   hidden: SectionKey[];
   views: SavedView[];
@@ -52,6 +55,7 @@ const DEFAULT_PREFS: Prefs = {
   lang: 'en',
   theme: 'light',
   density: 'comfortable',
+  currencyView: 'both',
   hidden: [],
   views: [],
   period: { granularity: 'month', anchor: INITIAL_ANCHOR },
@@ -70,6 +74,7 @@ interface AppContextValue extends Prefs {
   setTheme: (t: Theme) => void;
   toggleTheme: () => void;
   setDensity: (d: Density) => void;
+  setCurrencyView: (v: CurrencyView) => void;
   toggleSection: (k: SectionKey) => void;
   showAllSections: () => void;
   saveView: (name: string) => void;
@@ -98,6 +103,7 @@ function sanitize(raw: unknown): Partial<Prefs> {
   if (r.theme === 'light' || r.theme === 'dark') out.theme = r.theme;
   if (typeof r.platform === 'string') out.platform = r.platform;
   if (r.density === 'comfortable' || r.density === 'compact') out.density = r.density;
+  if (r.currencyView === 'both' || r.currencyView === 'USD' || r.currencyView === 'LYD') out.currencyView = r.currencyView;
   if (Array.isArray(r.hidden)) out.hidden = r.hidden.filter((x): x is SectionKey => (SECTIONS as readonly string[]).includes(x as string));
   if (Array.isArray(r.views)) {
     out.views = r.views
@@ -185,6 +191,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setTheme: (theme) => update({ theme }),
       toggleTheme: () => update((p) => ({ theme: p.theme === 'dark' ? 'light' : 'dark' })),
       setDensity: (density) => update({ density }),
+      setCurrencyView: (currencyView) => update({ currencyView }),
       toggleSection: (k) => update((p) => ({ hidden: p.hidden.includes(k) ? p.hidden.filter((x) => x !== k) : [...p.hidden, k] })),
       showAllSections: () => update({ hidden: [] }),
       saveView: (name) =>

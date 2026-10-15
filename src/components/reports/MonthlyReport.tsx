@@ -60,7 +60,7 @@ function Pill({ children }: { children: React.ReactNode }) {
 }
 
 export default function MonthlyReport() {
-  const { t, tr, lang, range, previous, period } = useApp();
+  const { t, tr, lang, range, previous, period, currencyView } = useApp();
   const { all, loading, error, refresh } = useDashboardData();
   // Items still to be paid (pending / upcoming) in the period: a small, server-filtered list. Totals never come from rows.
   const pendingState = useApiData<{ data: ApiTransaction[]; total: number }>(
@@ -160,7 +160,7 @@ export default function MonthlyReport() {
     ];
     return { cur, fmt, rows, headline, resultsLine, autoProblems, positives, negatives, delivered, sourceRows };
   };
-  const blocks = (['USD', 'LYD'] as const).map(build);
+  const blocks = (['USD', 'LYD'] as const).filter((c) => currencyView === 'both' || currencyView === c).map(build);
 
   /* ---- carried over: anything not yet paid in the period (each row keeps its own currency) ---- */
   const carried = txAll.filter((x) => x.status !== 'paid').sort((a, b) => a.date.localeCompare(b.date));

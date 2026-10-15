@@ -37,7 +37,7 @@ export default function OverviewPanel({ tab = 'summary' }: { tab?: OverviewTab }
       {inTab('summary') && show('position') && <FinancialPosition position={data.position} spending={data.spending} />}
 
       {inTab('summary') && show('kpis') && <h3 className="mb-3 font-head text-sm font-bold text-ink">{ui('kpi.title')}</h3>}
-      {inTab('summary') && show('kpis') && <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
+      {inTab('summary') && show('kpis') && <div className="grid grid-cols-1 gap-4 @md:grid-cols-2 @3xl:grid-cols-4">
         <KpiCard title={t.kpiIncome} metric={o.totalIncome} subtitle={t.vsLastMonth} language={lang} sentimentType="income" />
         <KpiCard title={t.kpiExpenses} metric={o.totalExpenses} subtitle={t.vsLastMonth} language={lang} sentimentType="expense" />
         <KpiCard title={t.kpiNetResult} metric={o.netResult} subtitle={t.vsLastMonth} language={lang} sentimentType="net" />
@@ -60,7 +60,7 @@ export default function OverviewPanel({ tab = 'summary' }: { tab?: OverviewTab }
         </div>
       )}
 
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-6 @3xl:grid-cols-2 [&>*]:min-w-0">
         {inTab('breakdown') && show('channels') && <PaymentChannelBreakdown incomeBreakdown={o.incomeByPaymentMethod} expensesBreakdown={o.expensesByPaymentMethod} currency={currency} language={lang} />}
         {inTab('breakdown') && show('budget') && <BudgetBurndown
           currentExpenses={o.totalExpenses.current}

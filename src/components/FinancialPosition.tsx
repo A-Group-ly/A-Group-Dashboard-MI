@@ -30,7 +30,7 @@ export default function FinancialPosition({ position, spending }: { position: Fi
   return (
     <section aria-labelledby={`pos-title-${currency}`} className="mb-6">
       <h3 id={`pos-title-${currency}`} className="mb-3 font-head text-sm font-bold text-ink">{t('pos.title')}</h3>
-      <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 @md:grid-cols-2 @3xl:grid-cols-4">
         {/* 1. Total paid */}
         <div className={card}>
           <div>

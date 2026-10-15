@@ -21,7 +21,7 @@ const TABS = ['summary', 'charts', 'breakdown', 'activity'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function OverviewPage() {
-  const { platform, hidden, tr: t, t: ui } = useApp();
+  const { platform, hidden, currencyView, tr: t, t: ui } = useApp();
   const { all, loading, error, refresh } = useDashboardData();
   const { can } = useAccess();
   const [saved, setTab] = useRememberedTab<Tab>('ag_tab_overview', TABS, 'summary');
@@ -41,10 +41,10 @@ export default function OverviewPage() {
   );
   const tab: Tab = available.includes(saved) ? saved : (available[0] ?? 'summary');
   const panels = (which: OverviewTab) => (
-    /* Physical order is fixed in both languages: USD on the left, LYD on the right. */
-    <div dir="ltr" className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-      <CurrencyScope currency="USD"><OverviewPanel tab={which} /></CurrencyScope>
-      <CurrencyScope currency="LYD"><OverviewPanel tab={which} /></CurrencyScope>
+    /* Physical order is fixed in both languages: USD on the left, LYD on the right. A single currency uses the full width. */
+    <div dir="ltr" className={`mb-8 grid grid-cols-1 gap-6 ${currencyView === 'both' ? 'xl:grid-cols-2' : ''}`}>
+      {currencyView !== 'LYD' && <CurrencyScope currency="USD"><OverviewPanel tab={which} /></CurrencyScope>}
+      {currencyView !== 'USD' && <CurrencyScope currency="LYD"><OverviewPanel tab={which} /></CurrencyScope>}
     </div>
   );
 
@@ -66,7 +66,7 @@ export default function OverviewPage() {
         <>
           {platform !== 'all' && <p role="note" className="mb-4 border border-line bg-surface-2 px-3 py-2 text-xs text-ink-2">{ui('scope.filterNote')}</p>}
           {seen('pulse') && <PulseStrip />}
-          <p className="mb-4 text-xs text-muted">{ui('cur.sideBySide')}</p>
+          {currencyView === 'both' && <p className="mb-4 text-xs text-muted">{ui('cur.sideBySide')}</p>}
           {panels('summary')}
         </>
       )}

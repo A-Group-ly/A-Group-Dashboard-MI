@@ -8,6 +8,7 @@ import { fetchRetry } from '@/lib/fetchRetry';
 import { useRouter } from 'next/navigation';
 import { useDashboardData } from '@/components/providers/DashboardDataProvider';
 import { controlClass, EmptyState, ErrorState } from './primitives';
+import FilterPopover, { FilterField } from './FilterPopover';
 
 export interface SCol<T> {
   key: string;
@@ -189,30 +190,56 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
           aria-label={t('f.search')}
           className={`${controlClass} w-full sm:w-64`}
         />
-        {filterDefs.map((f) => (
-          <select
-            key={f.key}
-            aria-label={f.label}
-            value={active[f.key] ?? 'all'}
-            onChange={(e) => {
-              setActive((a) => ({ ...a, [f.key]: e.target.value }));
+        {filterDefs.length > 0 && (
+          <FilterPopover
+            count={Object.values(active).filter((v) => v && v !== 'all').length}
+            onReset={() => {
+              setActive({});
               setPage(1);
             }}
-            className={controlClass}
           >
-            <option value="all">{f.label}: {t('misc.all')}</option>
-            {f.options.map((o) => (
-              <option key={o.v} value={o.v}>{o.l}</option>
+            {filterDefs.map((f) => (
+              <FilterField key={f.key} label={f.label}>
+                <select
+                  aria-label={f.label}
+                  value={active[f.key] ?? 'all'}
+                  onChange={(e) => {
+                    setActive((a) => ({ ...a, [f.key]: e.target.value }));
+                    setPage(1);
+                  }}
+                  className={`${controlClass} h-9`}
+                >
+                  <option value="all">{t('misc.all')}</option>
+                  {f.options.map((o) => (
+                    <option key={o.v} value={o.v}>{o.l}</option>
+                  ))}
+                </select>
+              </FilterField>
             ))}
-          </select>
-        ))}
-        {hasActive && (
+          </FilterPopover>
+        )}
+        {filterDefs
+          .filter((f) => active[f.key] && active[f.key] !== 'all')
+          .map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => {
+                setActive((a) => ({ ...a, [f.key]: 'all' }));
+                setPage(1);
+              }}
+              title={t('act.clear')}
+              className="inline-flex items-center gap-1.5 border border-line-strong bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-2 hover:border-ink"
+            >
+              {f.label}: {f.options.find((o) => o.v === active[f.key])?.l ?? active[f.key]} <span aria-hidden="true">✕</span>
+            </button>
+          ))}
+        {(q !== '') && (
           <button
             type="button"
             onClick={() => {
               setQ('');
               setDebouncedQ('');
-              setActive({});
               setPage(1);
             }}
             className="text-xs font-semibold text-accent-strong hover:underline"
