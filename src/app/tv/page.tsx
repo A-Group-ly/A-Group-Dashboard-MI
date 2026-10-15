@@ -21,7 +21,7 @@ type Slide = (typeof SLIDES)[number];
 /** Big number that can be blurred for shared-screen safety. */
 function Big({ value, hide, tone = '' }: { value: string; hide: boolean; tone?: string }) {
   return (
-    <div dir="ltr" className={`text-start font-head text-4xl font-bold tabular-nums tracking-tight transition-[filter] duration-200 sm:text-5xl xl:text-6xl rtl:text-end ${tone || 'text-ink'} ${hide ? 'select-none blur-md' : ''}`}>
+    <div dir="ltr" className={`text-start font-head text-[clamp(1.75rem,4.2vw,6rem)] font-bold leading-none tabular-nums tracking-tight transition-[filter] duration-200 rtl:text-end ${tone || 'text-ink'} ${hide ? 'select-none blur-md' : ''}`}>
       {value}
     </div>
   );
@@ -29,14 +29,14 @@ function Big({ value, hide, tone = '' }: { value: string; hide: boolean; tone?: 
 
 function Stat({ label, value, hide, tone }: { label: string; value: string; hide: boolean; tone?: string }) {
   return (
-    <div className="border-s-4 border-accent ps-4">
-      <div className="text-xs font-bold uppercase tracking-[0.1em] text-muted sm:text-sm">{label}</div>
+    <div className="border-s-[0.35vw] border-accent ps-[1.2vw]">
+      <div className="text-[clamp(0.7rem,1.05vw,1.4rem)] font-bold uppercase tracking-[0.1em] text-muted">{label}</div>
       <Big value={value} hide={hide} tone={tone} />
     </div>
   );
 }
 
-function SlideBody({ slide, data, hide }: { slide: Slide; data: OverviewBundle; hide: boolean }) {
+function SlideBody({ slide, data, hide, chartHeight }: { slide: Slide; data: OverviewBundle; hide: boolean; chartHeight: number }) {
   const { currency, lang, t } = useApp();
   const fmt = (v: number) => formatCurrency(v, currency);
   const p = data.position;
@@ -46,9 +46,9 @@ function SlideBody({ slide, data, hide }: { slide: Slide; data: OverviewBundle; 
   if (slide === 'position') {
     const change = pctChange(p.paid, p.paidPrevious);
     return (
-      <div className="space-y-8">
+      <div className="space-y-[clamp(1rem,3vh,3rem)]">
         <Stat label={t('pos.paid')} value={fmt(p.paid)} hide={hide} />
-        <p dir="ltr" className={`text-lg font-bold ${change === null ? 'text-muted' : change >= 0 ? 'text-ok-ink' : 'text-bad-ink'}`}>
+        <p dir="ltr" className={`text-[clamp(0.9rem,1.4vw,1.8rem)] font-bold ${change === null ? 'text-muted' : change >= 0 ? 'text-ok-ink' : 'text-bad-ink'}`}>
           {change === null ? `[${t('cmp.na')}]` : `[${change > 0 ? '+' : ''}${change.toFixed(1)}%]`} <span className="font-normal text-muted">{t('scope.vs')} {hide ? '•••' : fmt(p.paidPrevious)}</span>
         </p>
         <Stat label={t('pos.outstanding')} value={fmt(p.outstanding)} hide={hide} tone={p.overdue > 0 ? 'text-bad-ink' : ''} />
@@ -60,7 +60,7 @@ function SlideBody({ slide, data, hide }: { slide: Slide; data: OverviewBundle; 
     const pct = s.budgetConfigured && s.budgetCap > 0 ? (s.projected / s.budgetCap) * 100 : null;
     const share = pct === null ? null : Math.min(100, pct);
     return (
-      <div className="space-y-8">
+      <div className="space-y-[clamp(1rem,3vh,3rem)]">
         <Stat label={t('pos.spent')} value={fmt(s.spentToDate)} hide={hide} />
         <Stat label={t('pos.spendScheduled')} value={fmt(s.scheduledToMonthEnd)} hide={hide} />
         <Stat label={t('pos.spendProjected')} value={fmt(s.projected)} hide={hide} tone={s.budgetConfigured && s.projected > s.budgetCap ? 'text-bad-ink' : ''} />
@@ -87,7 +87,7 @@ function SlideBody({ slide, data, hide }: { slide: Slide; data: OverviewBundle; 
           ]}
           format={fmt}
           ariaLabel={`${t('chart.trend')} — ${currency}`}
-          height={300}
+          height={chartHeight}
         />
         <div className="mt-6 grid grid-cols-2 gap-6">
           <Stat label={t('tx.income')} value={fmt(o.totalIncome.current)} hide={hide} />
@@ -108,6 +108,8 @@ export default function TvPage() {
   const [paused, setPaused] = useState(false);
   const [hide, setHide] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [isFs, setIsFs] = useState(false);
+  const [vh, setVh] = useState(800);
 
   const exit = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
@@ -118,6 +120,21 @@ export default function TvPage() {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     else void document.documentElement.requestFullscreen?.().catch(() => {});
   };
+
+  // Track full screen and the real viewport height so the layout (and the chart) re-fit when either changes.
+  useEffect(() => {
+    const measure = () => {
+      setIsFs(!!document.fullscreenElement);
+      setVh(window.innerHeight);
+    };
+    measure();
+    document.addEventListener('fullscreenchange', measure);
+    window.addEventListener('resize', measure);
+    return () => {
+      document.removeEventListener('fullscreenchange', measure);
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
 
   // Rotate slides, refresh data and keep the clock honest.
   useEffect(() => {
@@ -162,7 +179,7 @@ export default function TvPage() {
   const title = { position: t('pos.title'), spending: t('pos.spendTitle'), trend: t('chart.trend'), pulse: t('pulse.title') }[slide];
 
   return (
-    <main className="min-h-screen bg-bg p-4 text-ink sm:p-8" aria-label={t('tv.title')}>
+    <main className="flex min-h-dvh flex-col bg-bg p-4 text-ink sm:p-6 2xl:p-10" aria-label={t('tv.title')}>
       <header className="mb-6 flex flex-wrap items-center gap-4">
         <Logo className="h-10 w-10 text-ink" />
         <div className="min-w-0">
@@ -173,13 +190,14 @@ export default function TvPage() {
         <div className="ms-auto flex flex-wrap items-center gap-2 text-xs">
           <button type="button" onClick={() => setPaused((p) => !p)} className="border border-line-strong bg-surface px-3 py-1.5 font-semibold transition-colors hover:bg-surface-2">{paused ? `▶ ${t('tv.play')}` : `❚❚ ${t('tv.pause')}`}</button>
           <button type="button" onClick={() => setHide((h) => !h)} aria-pressed={hide} className="border border-line-strong bg-surface px-3 py-1.5 font-semibold transition-colors hover:bg-surface-2">{hide ? t('tv.show') : t('tv.hide')}</button>
-          <button type="button" onClick={fullscreen} className="border border-line-strong bg-surface px-3 py-1.5 font-semibold transition-colors hover:bg-surface-2">{t('tv.fullscreen')}</button>
+          <button type="button" onClick={fullscreen} className="border border-line-strong bg-surface px-3 py-1.5 font-semibold transition-colors hover:bg-surface-2">{isFs ? t('tv.exitFullscreen') : t('tv.fullscreen')}</button>
           <button type="button" onClick={exit} className="border border-ink bg-ink px-3 py-1.5 font-semibold text-ink-contrast transition-opacity hover:opacity-85">{t('tv.exit')}</button>
         </div>
       </header>
 
+      <div className="flex flex-1 flex-col justify-center gap-[clamp(1rem,3vh,3rem)]">
       {slide === 'pulse' ? (
-        <section aria-live="polite" className="grid grid-cols-1 gap-8 md:grid-cols-2">
+        <section aria-live="polite" className="grid grid-cols-1 gap-[clamp(1.5rem,4vh,4rem)] md:grid-cols-2">
           <Stat label={t('pulse.customers')} value={pulse.customers.toLocaleString('en-US')} hide={false} />
           <Stat label={t('pulse.activeSubs')} value={pulse.subscriptions.active.toLocaleString('en-US')} hide={false} />
           <Stat label={`${t('pulse.mrr')} · USD`} value={formatCurrency(pulse.mrr.USD, 'USD')} hide={hide} />
@@ -189,27 +207,29 @@ export default function TvPage() {
         </section>
       ) : (
         /* Physical order is fixed in both languages: USD on the left, LYD on the right. */
-        <section dir="ltr" aria-live="polite" className="grid grid-cols-1 gap-10 lg:grid-cols-2">
+        <section dir="ltr" aria-live="polite" className="grid grid-cols-1 gap-[clamp(2rem,5vw,6rem)] lg:grid-cols-2">
           {(['USD', 'LYD'] as const).map((c) => (
             <CurrencyScope key={c} currency={c}>
               <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-w-0">
                 <div className="mb-5 flex items-baseline justify-between border-b-2 border-ink pb-2">
-                  <span dir="ltr" className="font-head text-2xl font-bold">{c}</span>
-                  <span className="text-sm font-semibold text-muted">{t(c === 'USD' ? 'cur.usd' : 'cur.lyd')}</span>
+                  <span dir="ltr" className="font-head text-[clamp(1.25rem,2.2vw,3rem)] font-bold">{c}</span>
+                  <span className="text-[clamp(0.8rem,1.1vw,1.5rem)] font-semibold text-muted">{t(c === 'USD' ? 'cur.usd' : 'cur.lyd')}</span>
                 </div>
-                <SlideBody slide={slide} data={all[c]} hide={hide} />
+                <SlideBody slide={slide} data={all[c]} hide={hide} chartHeight={Math.max(200, Math.min(620, Math.round(vh * 0.34)))} />
               </div>
             </CurrencyScope>
           ))}
         </section>
       )}
 
-      <nav aria-label={t('tv.slides')} className="mt-10 flex items-center justify-center gap-2">
+      </div>
+
+      <nav aria-label={t('tv.slides')} className="mt-6 flex items-center justify-center gap-2">
         {SLIDES.map((s, i) => (
           <button key={s} type="button" onClick={() => setIdx(i)} aria-label={`${i + 1}`} aria-current={i === idx} className={`h-2.5 transition-all duration-300 ${i === idx ? 'w-10 bg-accent' : 'w-2.5 bg-line-strong hover:bg-muted'}`} />
         ))}
       </nav>
-      <p className="mt-4 text-center text-[11px] text-muted">{t('tv.keys')}</p>
+      {!isFs && <p className="mt-4 text-center text-[11px] text-muted">{t('tv.keys')}</p>}
     </main>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useClerk } from '@clerk/nextjs';
 import { useApp } from '@/components/providers/AppProvider';
 import { useAccess } from '@/components/providers/AccessProvider';
@@ -19,7 +20,7 @@ function initials(name: string | null, email: string | null): string {
 export default function AccountMenu() {
   const { t } = useApp();
   const { me } = useAccess();
-  const { signOut, openUserProfile } = useClerk();
+  const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -75,17 +76,14 @@ export default function AccountMenu() {
               </span>
             </div>
           </div>
-          <button
+          <Link
             role="menuitem"
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              openUserProfile();
-            }}
+            href="/account"
+            onClick={() => setOpen(false)}
             className="block w-full px-4 py-2.5 text-start text-sm transition-colors hover:bg-surface-2"
           >
             {t('acct.manage')}
-          </button>
+          </Link>
           <button
             role="menuitem"
             type="button"

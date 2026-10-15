@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useApp } from '@/components/providers/AppProvider';
 import type { ApiState } from '@/components/providers/useApiData';
+import Copyable from './Copyable';
 
 /* ---------- Page header ---------- */
 
@@ -12,11 +13,14 @@ export function PageHeader({
   subtitle,
   actions,
   crumbs,
+  copyTitle,
 }: {
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
   crumbs?: { href?: string; label: string }[];
+  /** When set, clicking the title copies this value. */
+  copyTitle?: string;
 }) {
   return (
     <div className="mb-6">
@@ -38,7 +42,7 @@ export function PageHeader({
       )}
       <div className="flex flex-wrap items-end gap-4">
         <div className="min-w-0">
-          <h1 className="font-head text-2xl font-bold text-ink">{title}</h1>
+          <h1 className="font-head text-2xl font-bold text-ink">{copyTitle ? <Copyable value={copyTitle}>{title}</Copyable> : title}</h1>
           {subtitle && <p className="mt-1 max-w-3xl text-sm text-muted">{subtitle}</p>}
           {/* orange accent rule from the company guidelines */}
           <div className="mt-3 h-[3px] w-12 bg-accent" aria-hidden="true" />

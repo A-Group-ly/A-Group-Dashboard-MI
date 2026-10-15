@@ -229,3 +229,15 @@ h4 {
 /* Compact density: tighter table rows and cards (Settings > Display density). */
 html.density-compact tbody td { padding-top: 0.375rem; padding-bottom: 0.375rem; }
 html.density-compact thead th { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+
+
+/* Cursors and selection. Read-only content shows a normal arrow (no text I-beam, no accidental selection);
+   inputs keep the text cursor; clickable things show a pointer; copyable values show a copy cursor. */
+body { cursor: default; }
+main, aside, header, nav, table, [role="dialog"] { -webkit-user-select: none; user-select: none; }
+input, textarea, [contenteditable="true"], .selectable, [data-selectable] { -webkit-user-select: text; user-select: text; cursor: text; }
+a[href], button:not(:disabled), [role="button"], [role="tab"], [role="option"], [role="menuitem"], summary, select, label[for],
+input[type="checkbox"], input[type="radio"], input[type="date"], input[type="month"], .cl-rootBox button { cursor: pointer; }
+button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
+[data-copy] { cursor: copy; }
+@media print { main, table { -webkit-user-select: text; user-select: text; } }

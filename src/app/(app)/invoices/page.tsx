@@ -8,7 +8,7 @@ import { Card, DemoNotice, Money, PageHeader, StatusBadge } from '@/components/u
 import ServerTable, { type SCol, type SFilter } from '@/components/ui/ServerTable';
 import { Button, apiSend, useErrorText } from '@/components/ui/forms';
 import { useToast } from '@/components/providers/ToastProvider';
-import CopyButton from '@/components/ui/CopyButton';
+import Copyable from '@/components/ui/Copyable';
 import { NewInvoiceDialog, RecordPaymentDialog, VoidInvoiceDialog, type InvoiceLite } from '@/components/ops/BillingDialogs';
 
 interface InvRow extends InvoiceLite {
@@ -47,7 +47,7 @@ export default function InvoicesPage() {
   };
 
   const columns: SCol<InvRow>[] = [
-    { key: 'number', header: t('col.invoice'), sortKey: 'number', render: (i) => (<><span dir="ltr" className="font-semibold tabular-nums text-ink">{i.number}</span><CopyButton value={i.number} /></>) },
+    { key: 'number', header: t('col.invoice'), sortKey: 'number', render: (i) => (<Copyable value={i.number}><span dir="ltr" className="font-semibold tabular-nums text-ink">{i.number}</span></Copyable>) },
     { key: 'customer', header: t('col.customer'), sortKey: 'customer', render: (i) => <Link href={`/customers/${i.customerId}`} className="font-semibold text-ink transition-colors hover:text-accent-strong">{i.customerName}</Link> },
     { key: 'total', header: t('col.total'), align: 'end', sortKey: 'total', render: (i) => <Money value={i.total} currency={i.currency} /> },
     { key: 'issue', header: t('col.issue'), sortKey: 'issue', render: (i) => <span dir="ltr" className="tabular-nums text-muted">{i.issueDate}</span> },

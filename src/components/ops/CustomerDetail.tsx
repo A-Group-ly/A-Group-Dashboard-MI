@@ -8,7 +8,7 @@ import { useAccess } from '@/components/providers/AccessProvider';
 import { Button } from '@/components/ui/forms';
 import { CustomerDialog, CustomerStatusDialog } from './CustomerDialogs';
 import { NewInvoiceDialog, NewSubscriptionDialog } from './BillingDialogs';
-import CopyButton from '@/components/ui/CopyButton';
+import Copyable from '@/components/ui/Copyable';
 import { Badge } from '@/components/ui/primitives';
 import { ApiGate, Card, DemoNotice, EmptyState, Money, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import DataTable, { type Column } from '@/components/ui/DataTable';
@@ -94,6 +94,7 @@ export default function CustomerDetail({ id }: { id: string }) {
             <PageHeader
               title={c.displayName}
               subtitle={`${t(`type.${c.type}`)} · ${c.city}, ${c.country}`}
+              copyTitle={c.displayName}
               crumbs={[{ href: '/customers', label: t('cust.title') }, { label: c.id }]}
               actions={
                 <>
@@ -150,8 +151,8 @@ export default function CustomerDetail({ id }: { id: string }) {
             {tab === 'contact' && (
               <Card>
                 <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <Fact label={t('col.email')}><span dir="ltr">{c.email}</span><CopyButton value={c.email} label={t('col.email')} /></Fact>
-                  <Fact label={t('col.phone')}><span dir="ltr">{c.phone ?? '—'}</span>{c.phone && <CopyButton value={c.phone} label={t('col.phone')} />}</Fact>
+                  <Fact label={t('col.email')}><Copyable value={c.email}><span dir="ltr">{c.email}</span></Copyable></Fact>
+                  <Fact label={t('col.phone')}>{c.phone ? <Copyable value={c.phone}><span dir="ltr">{c.phone}</span></Copyable> : '—'}</Fact>
                   <Fact label={t('cust.business')}>{c.businessName ?? '—'}</Fact>
                   <Fact label={t('col.city')}>{c.city}</Fact>
                   <Fact label={t('col.country')}>{c.country}</Fact>

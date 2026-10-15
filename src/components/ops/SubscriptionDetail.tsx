@@ -50,6 +50,7 @@ export default function SubscriptionDetail({ id }: { id: string }) {
             <PageHeader
               title={`${t('sub.detail')} · ${s.id}`}
               subtitle={`${s.customerName} — ${s.productName} / ${s.planName}`}
+              copyTitle={s.id}
               crumbs={[{ href: '/subscriptions', label: t('sub.title') }, { label: s.id }]}
               actions={
                 can('subscriptions:write') || can('invoices:write') ? (

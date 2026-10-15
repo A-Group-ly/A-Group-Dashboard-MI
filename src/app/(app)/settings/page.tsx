@@ -8,6 +8,7 @@ import { ApiGate, Card, DemoNotice, PageHeader, controlClass } from '@/component
 import { ROLES, type Role } from '@/lib/permissions';
 import { Button, apiSend, useErrorText } from '@/components/ui/forms';
 import { useToast } from '@/components/providers/ToastProvider';
+import Copyable from '@/components/ui/Copyable';
 
 function Choice({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
@@ -82,7 +83,7 @@ function UsersPanel() {
                       {m.isYou && <span className="ms-2 text-xs font-normal text-muted">({t('users.you')})</span>}
                       {!m.isActive && <span className="ms-2 bg-bad-soft px-1.5 py-0.5 text-[10px] font-bold text-bad-ink">{t('users.inactive')}</span>}
                     </div>
-                    {m.name && m.email && <div dir="ltr" className="break-all text-xs text-muted">{m.email}</div>}
+                    {m.name && m.email && <div dir="ltr" className="break-all text-xs text-muted"><Copyable value={m.email} /></div>}
                   </div>
                   <select
                     aria-label={`${t('acct.role')}: ${m.name || m.email}`}

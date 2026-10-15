@@ -6,6 +6,7 @@ import { useApp } from '@/components/providers/AppProvider';
 import { useAccess } from '@/components/providers/AccessProvider';
 import { Card, DemoNotice, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import ServerTable, { type SCol, type SFilter } from '@/components/ui/ServerTable';
+import Copyable from '@/components/ui/Copyable';
 import { Button } from '@/components/ui/forms';
 import { CustomerDialog, type CustomerLite } from '@/components/ops/CustomerDialogs';
 
@@ -43,14 +44,14 @@ export default function CustomersPage() {
       render: (c) => (
         <>
           <Link href={`/customers/${c.id}`} className="font-semibold text-ink transition-colors hover:text-accent-strong">{c.displayName}</Link>
-          <div dir="ltr" className="text-[11px] text-muted">{c.id}</div>
+          <div dir="ltr" className="text-[11px] text-muted"><Copyable value={c.id} /></div>
         </>
       ),
     },
     { key: 'type', header: t('col.type'), sortKey: 'type', render: (c) => t(`type.${c.type}`) },
     { key: 'org', header: t('col.org'), render: (c) => c.orgName ?? '—' },
     { key: 'city', header: t('col.city'), sortKey: 'city', render: (c) => c.city },
-    { key: 'email', header: t('col.email'), render: (c) => <span dir="ltr">{c.email}</span> },
+    { key: 'email', header: t('col.email'), render: (c) => <Copyable value={c.email}><span dir="ltr">{c.email}</span></Copyable> },
     { key: 'subs', header: t('col.subs'), align: 'end', sortKey: 'subs', render: (c) => <span className="tabular-nums">{c.subscriptionCount}</span> },
     { key: 'status', header: t('col.status'), sortKey: 'status', render: (c) => <StatusBadge status={c.status} /> },
     { key: 'created', header: t('col.created'), sortKey: 'created', render: (c) => <span dir="ltr" className="tabular-nums text-muted">{c.createdAt}</span> },

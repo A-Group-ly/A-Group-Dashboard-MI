@@ -11,7 +11,7 @@ export default function Logo({ className = 'h-9 w-auto', title = 'A-Group' }: { 
       role="img"
       aria-label={title}
       className={`inline-block shrink-0 bg-current ${className}`}
-      style={{ aspectRatio: '320 / 296', WebkitMask: mask, mask }}
+      style={{ aspectRatio: '480 / 436', WebkitMask: mask, mask }}
     />
   );
 }
