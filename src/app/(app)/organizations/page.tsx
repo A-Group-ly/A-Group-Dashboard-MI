@@ -6,6 +6,7 @@ import { useApiData } from '@/components/providers/useApiData';
 import { ApiGate, Card, DemoNotice, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import DataTable, { type Column, type FilterDef } from '@/components/ui/DataTable';
 import Copyable from '@/components/ui/Copyable';
+import { Hl } from '@/components/ui/Highlight';
 
 interface Org {
   id: string;
@@ -30,8 +31,8 @@ export default function OrganizationsPage() {
       sort: (o) => o.name,
       render: (o) => (
         <>
-          <div className="font-semibold text-ink"><Copyable value={o.name} /></div>
-          <div dir="ltr" className="text-[11px] text-muted"><Copyable value={o.id} /></div>
+          <div className="font-semibold text-ink"><Copyable value={o.name}><Hl text={o.name} /></Copyable></div>
+          <div dir="ltr" className="text-[11px] text-muted"><Copyable value={o.id}><Hl text={o.id} /></Copyable></div>
         </>
       ),
     },

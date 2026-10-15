@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useApp } from '@/components/providers/AppProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import { controlClass } from './primitives';
+import { warmServer } from '@/lib/warm';
 
 /* ------------------------------------------------------------------ calling the API */
 
@@ -44,6 +45,7 @@ export function useErrorText() {
         // Prefer a translated reason when the server named one; otherwise the server's own sentence.
         return r.error ?? t('err.server');
       }
+      if (r.status >= 500) return t('err.waking');
       return t('err.server');
     },
     [t]
@@ -74,6 +76,7 @@ export function Modal({
 
   useEffect(() => {
     if (!open) return;
+    warmServer(); // the form's save request should find the server awake
     returnTo.current = document.activeElement as HTMLElement | null;
     const first = ref.current?.querySelector<HTMLElement>('input, select, textarea, button:not([data-close])');
     first?.focus();

@@ -3,7 +3,9 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useApp } from '@/components/providers/AppProvider';
 import { ConfirmDialog, Field, FormDialog, SelectInput, TextArea, TextInput, apiSend } from '@/components/ui/forms';
-import { controlClass } from '@/components/ui/primitives';
+import SearchBox from '@/components/ui/SearchBox';
+import { Highlight } from '@/components/ui/Highlight';
+import { fetchRetry } from '@/lib/fetchRetry';
 
 export interface CustomerLite {
   id: string;
@@ -124,22 +126,34 @@ export function CustomerStatusDialog({ open, customer, onClose, onDone }: { open
 /** Type-ahead customer search backed by the paginated customers API (never loads the whole list). */
 export function CustomerPicker({ value, onPick, error }: { value: CustomerLite | null; onPick: (c: CustomerLite | null) => void; error?: string }) {
   const { t } = useApp();
-  const id = useId();
+  const listId = useId();
   const [q, setQ] = useState('');
-  const [rows, setRows] = useState<CustomerLite[]>([]);
+  const [rows, setRows] = useState<CustomerLite[] | null>(null);
+  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const c = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- show the spinner for the request that starts now
+    setLoading(true);
     const timer = window.setTimeout(() => {
-      const qs = new URLSearchParams({ pageSize: '8', status: 'active', sort: 'name', ...(q ? { q } : {}) });
-      fetch(`/api/customers?${qs}`, { signal: c.signal, cache: 'no-store' })
+      const qs = new URLSearchParams({ pageSize: '8', status: 'active', sort: 'name', ...(q.trim() ? { q: q.trim() } : {}) });
+      fetchRetry(`/api/customers?${qs}`, { signal: c.signal, cache: 'no-store' })
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => d && setRows((d as { data: CustomerLite[] }).data))
-        .catch(() => {});
-    }, 250);
+        .then((d) => {
+          if (d) {
+            setRows((d as { data: CustomerLite[] }).data);
+            setActive(0);
+          }
+          setLoading(false);
+        })
+        .catch((e: { name?: string }) => {
+          if (e?.name !== 'AbortError') setLoading(false);
+        });
+    }, q.trim() ? 220 : 0);
     return () => {
       window.clearTimeout(timer);
       c.abort();
@@ -152,51 +166,79 @@ export function CustomerPicker({ value, onPick, error }: { value: CustomerLite |
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
+  const pick = (c: CustomerLite) => {
+    onPick(c);
+    setOpen(false);
+    setQ('');
+  };
+
   if (value) {
     return (
       <div className="flex items-center justify-between gap-3 border border-line-strong bg-surface-2 px-3 py-2 text-sm">
         <span className="min-w-0 break-words font-semibold text-ink">{value.displayName}</span>
-        <button type="button" onClick={() => onPick(null)} className="shrink-0 text-xs font-semibold text-accent-strong hover:underline">{t('act.edit')}</button>
+        <button type="button" onClick={() => onPick(null)} className="shrink-0 text-xs font-semibold text-accent-strong hover:underline">{t('act.change')}</button>
       </div>
     );
   }
+
+  const list = rows ?? [];
   return (
     <div ref={box} className="relative">
-      <input
-        id={id}
-        type="search"
+      <SearchBox
         value={q}
-        onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          setQ(e.target.value);
+        onChange={(v) => {
+          setQ(v);
           setOpen(true);
         }}
+        busy={loading}
         placeholder={t('cust.searchPh')}
-        autoComplete="off"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-activedescendant={open && list[active] ? `${listId}-${active}` : undefined}
         aria-invalid={Boolean(error)}
-        className={`${controlClass} w-full !py-2 text-sm ${error ? '!border-bad-ink' : ''}`}
+        onFocus={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (!open && (e.key === 'ArrowDown' || e.key === 'Enter')) setOpen(true);
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActive((a) => Math.min(list.length - 1, a + 1));
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActive((a) => Math.max(0, a - 1));
+          } else if (e.key === 'Enter' && open && list[active]) {
+            e.preventDefault();
+            pick(list[active]);
+          } else if (e.key === 'Escape' && open && !q) {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen(false);
+          }
+        }}
+        className={error ? '[&_input]:!border-bad-ink' : ''}
       />
       {open && (
-        <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto border border-line-strong bg-surface shadow-lg" role="listbox">
-          {rows.length === 0 ? (
-            <li className="px-3 py-2 text-xs text-muted">{t('f.noResults')}</li>
-          ) : (
-            rows.map((c) => (
-              <li key={c.id} role="option" aria-selected="false">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onPick(c);
-                    setOpen(false);
-                  }}
-                  className="block w-full px-3 py-2 text-start text-sm transition-colors hover:bg-surface-2"
-                >
-                  <span className="block font-semibold text-ink">{c.displayName}</span>
-                  <span dir="ltr" className="block text-[11px] text-muted">{c.email}</span>
-                </button>
-              </li>
-            ))
+        <ul id={listId} role="listbox" aria-label={t('sub.customer')} className="absolute z-10 mt-1 max-h-64 w-full overflow-auto border border-line-strong bg-surface shadow-lg">
+          {!q.trim() && list.length > 0 && <li role="presentation" className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.1em] text-muted">{t('pick.suggested')}</li>}
+          {rows !== null && list.length === 0 && !loading && (
+            <li role="presentation" className="px-3 py-3 text-xs text-muted">
+              {q.trim() ? `${t('pick.noMatch')} “${q.trim()}”` : t('f.noResults')}
+            </li>
           )}
+          {rows === null && <li role="presentation" className="px-3 py-3 text-xs text-muted">…</li>}
+          {list.map((c, i) => (
+            <li key={c.id} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
+              <button
+                type="button"
+                onMouseEnter={() => setActive(i)}
+                onClick={() => pick(c)}
+                className={`block w-full px-3 py-2 text-start text-sm transition-colors ${i === active ? 'bg-accent-soft' : 'hover:bg-surface-2'}`}
+              >
+                <span className="block font-semibold text-ink" dir="auto"><Highlight text={c.displayName} query={q} /></span>
+                <span dir="ltr" className="block text-[11px] text-muted"><Highlight text={c.email} query={q} /></span>
+              </button>
+            </li>
+          ))}
         </ul>
       )}
     </div>

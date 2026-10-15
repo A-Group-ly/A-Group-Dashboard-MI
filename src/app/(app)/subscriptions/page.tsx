@@ -6,6 +6,7 @@ import { useApp } from '@/components/providers/AppProvider';
 import { useAccess } from '@/components/providers/AccessProvider';
 import { Card, DemoNotice, Money, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import ServerTable, { type SCol, type SFilter } from '@/components/ui/ServerTable';
+import { Hl } from '@/components/ui/Highlight';
 import { Button } from '@/components/ui/forms';
 import { NewSubscriptionDialog, PlanDialog } from '@/components/ops/BillingDialogs';
 
@@ -41,10 +42,10 @@ export default function SubscriptionsPage() {
   const [newPlan, setNewPlan] = useState(false);
 
   const columns: SCol<SubRow>[] = [
-    { key: 'id', header: 'ID', sortKey: 'id', render: (s) => <Link href={`/subscriptions/${s.id}`} dir="ltr" className="font-semibold tabular-nums text-ink transition-colors hover:text-accent-strong">{s.id}</Link> },
-    { key: 'customer', header: t('col.customer'), sortKey: 'customer', render: (s) => <Link href={`/customers/${s.customerId}`} className="font-semibold text-ink transition-colors hover:text-accent-strong">{s.customerName}</Link> },
-    { key: 'product', header: t('col.product'), render: (s) => s.productName },
-    { key: 'plan', header: t('col.plan'), render: (s) => s.planName },
+    { key: 'id', header: 'ID', sortKey: 'id', render: (s) => <Link href={`/subscriptions/${s.id}`} dir="ltr" className="font-semibold tabular-nums text-ink transition-colors hover:text-accent-strong"><Hl text={s.id} /></Link> },
+    { key: 'customer', header: t('col.customer'), sortKey: 'customer', render: (s) => <Link href={`/customers/${s.customerId}`} className="font-semibold text-ink transition-colors hover:text-accent-strong"><Hl text={s.customerName} /></Link> },
+    { key: 'product', header: t('col.product'), render: (s) => <Hl text={s.productName} /> },
+    { key: 'plan', header: t('col.plan'), render: (s) => <Hl text={s.planName} /> },
     { key: 'price', header: t('col.price'), align: 'end', sortKey: 'price', render: (s) => <Money value={s.price} currency={s.currency} /> },
     { key: 'interval', header: t('col.interval'), render: (s) => t(`iv.${s.interval}`) },
     { key: 'status', header: t('col.status'), sortKey: 'status', render: (s) => <StatusBadge status={s.status} /> },

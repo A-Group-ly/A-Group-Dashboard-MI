@@ -9,6 +9,7 @@ import ServerTable, { type SCol, type SFilter } from '@/components/ui/ServerTabl
 import { Button, apiSend, useErrorText } from '@/components/ui/forms';
 import { useToast } from '@/components/providers/ToastProvider';
 import Copyable from '@/components/ui/Copyable';
+import { Hl } from '@/components/ui/Highlight';
 import BulkInvoiceBar from '@/components/ops/BulkInvoiceBar';
 import { NewInvoiceDialog, RecordPaymentDialog, VoidInvoiceDialog, type InvoiceLite } from '@/components/ops/BillingDialogs';
 
@@ -48,8 +49,8 @@ export default function InvoicesPage() {
   };
 
   const columns: SCol<InvRow>[] = [
-    { key: 'number', header: t('col.invoice'), sortKey: 'number', render: (i) => (<Copyable value={i.number}><span dir="ltr" className="font-semibold tabular-nums text-ink">{i.number}</span></Copyable>) },
-    { key: 'customer', header: t('col.customer'), sortKey: 'customer', render: (i) => <Link href={`/customers/${i.customerId}`} className="font-semibold text-ink transition-colors hover:text-accent-strong">{i.customerName}</Link> },
+    { key: 'number', header: t('col.invoice'), sortKey: 'number', render: (i) => (<Copyable value={i.number}><span dir="ltr" className="font-semibold tabular-nums text-ink"><Hl text={i.number} /></span></Copyable>) },
+    { key: 'customer', header: t('col.customer'), sortKey: 'customer', render: (i) => <Link href={`/customers/${i.customerId}`} className="font-semibold text-ink transition-colors hover:text-accent-strong"><Hl text={i.customerName} /></Link> },
     { key: 'total', header: t('col.total'), align: 'end', sortKey: 'total', render: (i) => <Money value={i.total} currency={i.currency} /> },
     { key: 'issue', header: t('col.issue'), sortKey: 'issue', render: (i) => <span dir="ltr" className="tabular-nums text-muted">{i.issueDate}</span> },
     { key: 'due', header: t('col.due'), sortKey: 'due', render: (i) => <span dir="ltr" className="tabular-nums text-muted">{i.dueDate}</span> },

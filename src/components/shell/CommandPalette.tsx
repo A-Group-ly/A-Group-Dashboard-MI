@@ -7,6 +7,8 @@ import { useAccess } from '@/components/providers/AccessProvider';
 import { ROUTE_PERMISSION, type Permission } from '@/lib/permissions';
 import { formatCurrency } from '@/lib/calculations';
 import { Modal } from '@/components/ui/forms';
+import SearchBox from '@/components/ui/SearchBox';
+import { Highlight } from '@/components/ui/Highlight';
 import { clearRecent, getRecent, type RecentItem } from '@/lib/recent';
 
 interface Item {
@@ -57,6 +59,7 @@ export default function CommandPalette({ openSignal }: { openSignal: number }) {
   const [results, setResults] = useState<SearchResults | null>(null);
   const [active, setActive] = useState(0);
   const [recent, setRecent] = useState<RecentItem[]>([]);
+  const [searching, setSearching] = useState(false);
   const gPending = useRef(0);
 
   const allowed = useMemo(() => PAGES.filter((p) => can((ROUTE_PERMISSION[p.href] ?? 'dashboard:view') as Permission)), [can]);
@@ -116,11 +119,17 @@ export default function CommandPalette({ openSignal }: { openSignal: number }) {
       return;
     }
     const c = new AbortController();
+    setSearching(true);
     const timer = window.setTimeout(() => {
       fetch(`/api/search?q=${encodeURIComponent(q.trim())}`, { signal: c.signal, cache: 'no-store' })
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => d && setResults(d as SearchResults))
-        .catch(() => {});
+        .then((d) => {
+          if (d) setResults(d as SearchResults);
+          setSearching(false);
+        })
+        .catch((e: { name?: string }) => {
+          if (e?.name !== 'AbortError') setSearching(false);
+        });
     }, 220);
     return () => {
       window.clearTimeout(timer);
@@ -169,18 +178,19 @@ export default function CommandPalette({ openSignal }: { openSignal: number }) {
   return (
     <>
       <Modal open={open} title={t('cmd.title')} onClose={() => setOpen(false)}>
-        <input
+        <SearchBox
           autoFocus
-          type="search"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={setQ}
+          busy={searching && q.trim().length >= 2}
           onKeyDown={onInputKey}
           placeholder={t('cmd.placeholder')}
           aria-label={t('cmd.title')}
-          className="mb-3 w-full border border-line-strong bg-surface px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+          className="mb-3"
         />
+        {q.trim().length === 1 && <p className="mb-2 text-[11px] text-muted">{t('cmd.minChars')}</p>}
         <ul className="max-h-[50vh] overflow-auto" role="listbox">
-          {items.length === 0 && <li className="px-2 py-3 text-xs text-muted">{t('f.noResults')}</li>}
+          {items.length === 0 && <li className="px-2 py-3 text-xs text-muted">{q.trim() ? `${t('pick.noMatch')} “${q.trim()}”` : t('f.noResults')}</li>}
           {items.map((it, idx) => {
             const header = it.group !== lastGroup ? it.group : null;
             lastGroup = it.group;
@@ -194,7 +204,7 @@ export default function CommandPalette({ openSignal }: { openSignal: number }) {
                     onMouseEnter={() => setActive(idx)}
                     className={`flex w-full items-center justify-between gap-3 px-2 py-2 text-start text-sm transition-colors ${idx === active ? 'bg-accent-soft text-accent-strong' : 'text-ink hover:bg-surface-2'}`}
                   >
-                    <span className="min-w-0 break-words font-semibold" dir="auto">{it.label}</span>
+                    <span className="min-w-0 break-words font-semibold" dir="auto"><Highlight text={it.label} query={q} /></span>
                     {it.hint && <span dir="ltr" className="max-w-[45%] shrink-0 break-all text-end text-[11px] text-muted">{it.hint}</span>}
                   </button>
                 </li>

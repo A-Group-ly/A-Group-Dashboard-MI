@@ -3,6 +3,8 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '@/components/providers/AppProvider';
 import { controlClass, EmptyState } from './primitives';
+import SearchBox from './SearchBox';
+import { SearchQueryContext } from './Highlight';
 
 export interface Column<T> {
   key: string;
@@ -92,20 +94,19 @@ export default function DataTable<T>({
   };
 
   return (
+    <SearchQueryContext.Provider value={q.trim()}>
     <div>
       {(searchFields || filters.length > 0) && (
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
         {searchFields && (
-          <input
-            type="search"
+          <SearchBox
             value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
+            onChange={(v) => {
+              setQ(v);
               setPage(1);
             }}
             placeholder={searchPlaceholder ?? t('f.search')}
-            aria-label={t('f.search')}
-            className={`${controlClass} w-56`}
+            className="w-full sm:w-72"
           />
         )}
         {filters.map((f) => (
@@ -228,5 +229,6 @@ export default function DataTable<T>({
         )}
       </div>
     </div>
+    </SearchQueryContext.Provider>
   );
 }

@@ -7,6 +7,7 @@ import { PLATFORM_BY_CODE, type ApiTransaction } from '@/lib/mapApi';
 import { formatCurrency } from '@/lib/calculations';
 import { Badge, Card, type BadgeTone } from '@/components/ui/primitives';
 import ServerTable, { type SCol, type SFilter } from '@/components/ui/ServerTable';
+import { Hl } from '@/components/ui/Highlight';
 import { Button, ConfirmDialog, Field, FormDialog, SelectInput, TextInput, apiSend } from '@/components/ui/forms';
 
 type Row = ApiTransaction & { reference?: string | null; dueDate?: string | null; platformId?: string | null };
@@ -110,8 +111,8 @@ export default function TransactionsPanel() {
       sortKey: 'description',
       render: (r) => (
         <>
-          <div className="font-semibold text-ink">{lang === 'ar' ? r.descriptionAr || r.description : r.description}</div>
-          {r.reference && <div dir="ltr" className="text-[11px] text-muted">{r.reference}</div>}
+          <div className="font-semibold text-ink"><Hl text={lang === 'ar' ? r.descriptionAr || r.description : r.description} /></div>
+          {r.reference && <div dir="ltr" className="text-[11px] text-muted"><Hl text={r.reference} /></div>}
         </>
       ),
     },

@@ -9,6 +9,8 @@ import { useRouter } from 'next/navigation';
 import { useDashboardData } from '@/components/providers/DashboardDataProvider';
 import { controlClass, EmptyState, ErrorState } from './primitives';
 import FilterPopover, { FilterField } from './FilterPopover';
+import SearchBox from './SearchBox';
+import { SearchQueryContext } from './Highlight';
 
 export interface SCol<T> {
   key: string;
@@ -180,15 +182,15 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
   }
 
   return (
+    <SearchQueryContext.Provider value={debouncedQ}>
     <div>
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
-        <input
-          type="search"
+        <SearchBox
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={setQ}
+          busy={loading && debouncedQ !== '' && resp !== null}
           placeholder={searchPlaceholder ?? t('f.search')}
-          aria-label={t('f.search')}
-          className={`${controlClass} w-full sm:w-64`}
+          className="w-full sm:w-72"
         />
         {filterDefs.length > 0 && (
           <FilterPopover
@@ -322,7 +324,26 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
             ) : resp.data.length === 0 ? (
               <tr>
                 <td colSpan={columns.length + (bulkActions ? 1 : 0)}>
-                  <EmptyState title={t('f.noResults')} body={emptyBody} />
+                  <EmptyState
+                    title={debouncedQ ? `${t('pick.noMatch')} “${debouncedQ}”` : t('f.noResults')}
+                    body={debouncedQ || hasActive ? t('f.tryOther') : emptyBody}
+                  />
+                  {(debouncedQ || hasActive) && (
+                    <div className="-mt-4 pb-8 text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQ('');
+                          setDebouncedQ('');
+                          setActive({});
+                          setPage(1);
+                        }}
+                        className="text-xs font-semibold text-accent-strong hover:underline"
+                      >
+                        {t('act.clear')}
+                      </button>
+                    </div>
+                  )}
                   {!hasActive && total === 0 && emptyAction && <div className="-mt-4 pb-8 text-center">{emptyAction}</div>}
                 </td>
               </tr>
@@ -401,5 +422,6 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
         )}
       </div>
     </div>
+    </SearchQueryContext.Provider>
   );
 }

@@ -12,6 +12,7 @@ import AccountMenu from './AccountMenu';
 import CommandPalette from './CommandPalette';
 import NotificationBell from './NotificationBell';
 import BackToTop from './BackToTop';
+import { warmServer } from '@/lib/warm';
 
 const NAV: { group?: string; items: { href: string; key: string }[] }[] = [
   { items: [{ href: '/', key: 'nav.overview' }] },
@@ -103,6 +104,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [toggleSidebar]);
+
+  // While the dashboard is open and visible, keep the server and the free-tier database awake (cheap, rate-limited).
+  useEffect(() => {
+    const tick = () => {
+      if (!document.hidden) warmServer(120000);
+    };
+    const id = window.setInterval(tick, 150000);
+    const onVisible = () => !document.hidden && warmServer(60000);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   const sidebarVisible = desktop ? !collapsed : open;
 
