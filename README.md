@@ -122,7 +122,4 @@ Next is pinned to 16.3.8 because 16.4.0 breaks OpenNext 1.20.11.
 - `prisma/` schema, migrations, seed
 - `docs/design/company-ui-guidelines.md`, `plans/` product scope and roadmap; `plans/implementation-status.md` current status
 
-## Known limits
 
-Create/edit workflows, TV mode and real payment processing are out of scope for this phase. The logo is a placeholder
-mark until the official SVG is supplied. Worker free-plan CPU time (10 ms per request) may be tight under load.
