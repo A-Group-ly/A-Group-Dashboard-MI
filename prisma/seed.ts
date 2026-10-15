@@ -277,7 +277,7 @@ async function main() {
       })
     )
   );
-  const [lydCash, lydBank, usdBank, usdCardProcessor] = accounts;
+  const [lydCash, lydBank, , usdCardProcessor] = accounts;
   console.log('✅ Financial accounts created');
 
   for (const currency of ['LYD', 'USD'] as const) {

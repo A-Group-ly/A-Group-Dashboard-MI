@@ -411,3 +411,23 @@ model BillingPayment {
   @@index([organizationId, status, date])
   @@index([invoiceId])
 }
+
+// ============================================================================
+// Audit trail (who changed what). No foreign keys on purpose: history must survive deletions.
+// ============================================================================
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorUserId    String?
+  actorName      String?
+  actorRole      Role?
+  action         String
+  entity         String
+  entityId       String?
+  summary        String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([entity, entityId])
+}
