@@ -60,7 +60,7 @@ const DEFAULT_PREFS: Prefs = {
   views: [],
   period: { granularity: 'month', anchor: INITIAL_ANCHOR },
   platform: 'all',
-  refreshSeconds: 120,
+  refreshSeconds: 300,
 };
 
 const STORAGE_KEY = 'ag_prefs_v2';

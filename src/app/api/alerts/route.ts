@@ -87,4 +87,4 @@ export const GET = guard('alerts:view', async (req, access, prisma) => {
   const activity = await recentActivity(prisma, org, today, 14);
 
   return json({ asOf: today, alerts: items, activity });
-});
+}, { cacheMs: 45000 });

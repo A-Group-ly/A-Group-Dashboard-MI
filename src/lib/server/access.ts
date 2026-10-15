@@ -4,7 +4,7 @@ import type { PrismaClient } from '@prisma/client';
 import { TENANT_ORG_ID } from '../constants';
 import type { Role } from '../permissions';
 import { devBypassRole } from '../devBypass';
-import { getPrisma } from './db';
+import { getPrisma, getReadPrisma, release } from './db';
 
 export interface Access {
   userId: string;
@@ -20,8 +20,8 @@ export type AccessResult =
   | { status: 'unauthenticated' }
   | { status: 'forbidden'; reason: 'inactive' | 'no-membership' };
 
-async function ensureLocalUserOnce(prisma: PrismaClient, clerkUserId: string) {
-  const existing = await prisma.user.findUnique({
+async function ensureLocalUserOnce(read: PrismaClient, clerkUserId: string) {
+  const existing = await read.user.findUnique({
     where: { clerkUserId },
     include: { memberships: { where: { organizationId: TENANT_ORG_ID }, take: 1 } },
   });
@@ -32,6 +32,8 @@ async function ensureLocalUserOnce(prisma: PrismaClient, clerkUserId: string) {
   const email = cu?.primaryEmailAddress?.emailAddress ?? cu?.emailAddresses?.[0]?.emailAddress ?? null;
   const name = [cu?.firstName, cu?.lastName].filter(Boolean).join(' ') || cu?.username || null;
 
+  const prisma = getPrisma(); // write client: needed only the very first time a person signs in
+  try {
   const user =
     existing ??
     (await prisma.user.upsert({
@@ -48,6 +50,9 @@ async function ensureLocalUserOnce(prisma: PrismaClient, clerkUserId: string) {
     create: { userId: user.id, organizationId: TENANT_ORG_ID, role: admins === 0 ? 'ADMIN' : 'READ_ONLY' },
   });
   return { user, membership };
+  } finally {
+    await release(prisma);
+  }
 }
 
 /**
@@ -81,8 +86,7 @@ export const getAccess = cache(async (): Promise<AccessResult> => {
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) return { status: 'unauthenticated' };
 
-  const prisma = getPrisma();
-  const { user, membership } = await ensureLocalUser(prisma, clerkUserId);
+  const { user, membership } = await ensureLocalUser(getReadPrisma(), clerkUserId);
   if (!user.isActive) return { status: 'forbidden', reason: 'inactive' };
   if (!membership) return { status: 'forbidden', reason: 'no-membership' };
 

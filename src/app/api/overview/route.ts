@@ -52,4 +52,4 @@ export const GET = guard('dashboard:view', async (req, access, prisma) => {
   );
 
   return json({ range, previousRange: prev, platform: platformId, pulse, currencies });
-});
+}, { cacheMs: 45000 });

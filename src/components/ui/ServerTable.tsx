@@ -64,6 +64,9 @@ interface Props<T, R extends Page<T>> {
  * Table backed by a server-side search / filter / sort / pagination endpoint, so large lists (thousands of
  * rows) are never shipped to the browser. Keeps the previous rows visible while the next page loads.
  */
+/** Last good page per query for the session: paging back and forth, or returning to a list, paints instantly. */
+const pageMemo = new Map<string, unknown>();
+
 export default function ServerTable<T, R extends Page<T> = Page<T>>({
   endpoint,
   columns,
@@ -148,10 +151,18 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mark the request as loading
     setLoading(true);
     setSelected(new Set());
-    fetchRetry(`${endpoint}?${qs}`, { signal: controller.signal, cache: 'no-store' })
+    const memoKey = `${endpoint}?${qs}`;
+    const remembered = pageMemo.get(memoKey) as R | undefined;
+    if (remembered) {
+      setResp(remembered);
+    }
+    const fresh = reloadKey > 0 || nonce > 0 || version > 0;
+    fetchRetry(fresh ? `${memoKey}&fresh=1` : memoKey, { signal: controller.signal, cache: 'no-store' })
       .then(async (res) => {
         if (!res.ok) throw Object.assign(new Error('http'), { status: res.status });
-        setResp((await res.json()) as R);
+        const body = (await res.json()) as R;
+        pageMemo.set(memoKey, body);
+        setResp(body);
         setErrorStatus(null);
         setLoading(false);
       })

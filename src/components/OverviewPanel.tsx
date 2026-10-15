@@ -8,13 +8,16 @@ import KpiCard from '@/components/KpiCard';
 import BudgetBurndown from '@/components/BudgetBurndown';
 import PaymentChannelBreakdown from '@/components/PaymentChannelBreakdown';
 import ComparisonBars from '@/components/charts/ComparisonBars';
-import ChartsSection from '@/components/charts/ChartsSection';
+import dynamic from 'next/dynamic';
 import FinancialPosition from '@/components/FinancialPosition';
 
 /**
  * Everything for ONE currency (the enclosing <CurrencyScope>). The overview renders two of these side by
  * side: USD on the left, LYD on the right. Amounts are never combined across currencies.
  */
+// Charts are the heaviest part of the page: load their code only when the Charts tab is opened.
+const ChartsSection = dynamic(() => import('@/components/charts/ChartsSection'), { loading: () => <div className="skeleton h-72" /> });
+
 export type OverviewTab = 'summary' | 'charts' | 'breakdown';
 
 export default function OverviewPanel({ tab = 'summary' }: { tab?: OverviewTab }) {

@@ -18,25 +18,32 @@ export interface ApiState<T> {
  * - keeps the last valid data while refreshing (no blank flash, no zeros on failure)
  * - refetches when the global refresh status succeeds (click or auto-refresh), so pages stay in step
  */
+/** Last good answer per URL, kept for the session: going back to a page paints at once, then refreshes quietly. */
+const memo = new Map<string, unknown>();
+
 export function useApiData<T>(url: string | null): ApiState<T> {
   const { version } = useDashboardData();
-  const [state, setState] = useState<{ url: string | null; data: T | null; errorStatus: number | null; loading: boolean }>({
-    url: null,
-    data: null,
+  const [state, setState] = useState<{ url: string | null; data: T | null; errorStatus: number | null; loading: boolean }>(() => ({
+    url,
+    data: url && memo.has(url) ? (memo.get(url) as T) : null,
     errorStatus: null,
-    loading: true,
-  });
+    loading: !(url && memo.has(url)),
+  }));
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     if (!url) return;
     const controller = new AbortController();
+    const remembered = memo.has(url) ? (memo.get(url) as T) : null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mark loading for the new request
-    setState((s) => ({ ...s, loading: s.url !== url || s.data === null, errorStatus: null }));
-    fetchRetry(url, { signal: controller.signal, cache: 'no-store' })
+    setState((s) => (s.url === url && s.data !== null ? { ...s, errorStatus: null } : { url, data: remembered, errorStatus: null, loading: remembered === null }));
+    // After a change or a manual refresh the server's short cache is skipped.
+    const target = nonce > 0 || version > 0 ? `${url}${url.includes('?') ? '&' : '?'}fresh=1` : url;
+    fetchRetry(target, { signal: controller.signal, cache: 'no-store' })
       .then(async (res) => {
         if (!res.ok) throw Object.assign(new Error('http'), { status: res.status });
         const body = (await res.json()) as T;
+        memo.set(url, body);
         setState({ url, data: body, errorStatus: null, loading: false });
       })
       .catch((e: { name?: string; status?: number }) => {

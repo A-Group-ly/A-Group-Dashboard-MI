@@ -7,4 +7,4 @@ export const dynamic = 'force-dynamic';
 export const GET = guard('reports:view', async (req, access, prisma) => {
   const today = todayIso(new URL(req.url).searchParams);
   return json({ asOf: today, ...(await billingAnalytics(prisma, access.organizationId, today)) });
-});
+}, { cacheMs: 60000 });

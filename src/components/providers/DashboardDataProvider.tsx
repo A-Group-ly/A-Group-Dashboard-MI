@@ -87,6 +87,7 @@ interface DashboardState {
 }
 
 const Ctx = createContext<DashboardState | null>(null);
+const CACHE_KEY = 'ag_overview_cache_v1';
 
 /** What consumers see: the state plus the data of the enclosing <CurrencyScope> currency (LYD outside any scope). */
 export interface DashboardDataValue extends DashboardState {
@@ -116,9 +117,16 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
   const requestId = useRef(0);
   const lastSuccessRef = useRef<number | null>(null);
 
-  const load = useCallback(async () => {
-    // A request for this scope is already running: never stack another one.
-    if (inFlight.current && !inFlight.current.signal.aborted) return;
+  /**
+   * `fresh` asks the server to skip its short cache (manual refresh, after a change); `bump` tells the other
+   * widgets on the page to refetch too. The first load of a scope bumps nothing: they load themselves.
+   */
+  const load = useCallback(async (opts: { fresh?: boolean; bump?: boolean } = {}) => {
+    // A request for this scope is already running: never stack another one (a fresh one replaces it).
+    if (inFlight.current && !inFlight.current.signal.aborted) {
+      if (!opts.fresh) return;
+      inFlight.current.abort();
+    }
     const controller = new AbortController();
     inFlight.current = controller;
     const id = ++requestId.current;
@@ -134,6 +142,7 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
         prevTo: previous.to,
       });
       if (platformCode) qs.set('platform', platformCode);
+      if (opts.fresh) qs.set('fresh', '1');
       const res = await fetchRetry(`/api/overview?${qs}`, { signal: controller.signal, cache: 'no-store' });
       if (!res.ok) throw new HttpError(res.status);
       const body = await res.json();
@@ -145,7 +154,12 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
       setError(null);
       setErrorStatus(null);
       setStatus('ok');
-      setVersion((v) => v + 1);
+      if (opts.bump) setVersion((v) => v + 1);
+      try {
+        window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ key, at: now, currencies: body.currencies, pulse: body.pulse }));
+      } catch {
+        /* storage full or blocked: only the instant paint on the next visit is lost */
+      }
     } catch (e) {
       if (controller.signal.aborted || id !== requestId.current) return;
       setErrorStatus(e instanceof HttpError ? e.status : null);
@@ -161,12 +175,36 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
     inFlight.current?.abort();
     inFlight.current = null;
     requestId.current += 1;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset visible status for the new scope
+    // Show the last result for this scope immediately (if this browser has one), then refresh it in the background.
+    try {
+      const raw = window.sessionStorage.getItem(CACHE_KEY);
+      const c = raw ? (JSON.parse(raw) as { key: string; at: number; currencies: ByCurrency; pulse: PulseData }) : null;
+      if (c && c.key === key && Date.now() - c.at < 20 * 60 * 1000) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- paint the cached result right away
+        setData({ key: c.key, currencies: c.currencies, pulse: c.pulse });
+      }
+    } catch {
+      /* unreadable cache: just load */
+    }
     setStatus('loading');
     void load();
     return () => {
       inFlight.current?.abort();
       inFlight.current = null;
+    };
+  }, [load, key]);
+
+  // Any successful write (add / edit / pay / void ...) makes the numbers stale: reload them without the server cache.
+  useEffect(() => {
+    let timer: number | undefined;
+    const onChanged = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => void load({ fresh: true, bump: true }), 350);
+    };
+    window.addEventListener('ag:data-changed', onChanged);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('ag:data-changed', onChanged);
     };
   }, [load]);
 
@@ -175,10 +213,10 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
     if (refreshSeconds <= 0) return;
     const ms = refreshSeconds * 1000;
     const timer = window.setInterval(() => {
-      if (!document.hidden) void load();
+      if (!document.hidden) void load({ bump: true });
     }, ms);
     const onVisible = () => {
-      if (!document.hidden && (!lastSuccessRef.current || Date.now() - lastSuccessRef.current > ms)) void load();
+      if (!document.hidden && (!lastSuccessRef.current || Date.now() - lastSuccessRef.current > ms)) void load({ bump: true });
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
@@ -202,7 +240,7 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
       lastSuccessAt,
       lastAttemptAt,
       version,
-      refresh: () => void load(),
+      refresh: () => void load({ fresh: true, bump: true }),
     }),
     [usable, pulse, status, errorStatus, error, lastSuccessAt, lastAttemptAt, version, load]
   );

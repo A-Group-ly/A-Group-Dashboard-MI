@@ -3,7 +3,8 @@ import type { PrismaClient } from '@prisma/client';
 import { can, type Permission } from '../permissions';
 import { isIsoDate, previousRange, resolveRange, type PeriodSpec, type Range } from '../period';
 import { getAccess, type Access } from './access';
-import { getPrisma, isWorkers } from './db';
+import { cached, invalidateOrg } from './cache';
+import { getPrisma, getReadPrisma, release } from './db';
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' };
 
@@ -22,7 +23,9 @@ type Ctx<P> = { params: Promise<P> };
  */
 export function guard<P = Record<string, never>>(
   permission: Permission | null,
-  handler: (req: NextRequest, access: Access, prisma: PrismaClient, ctx: Ctx<P>) => Promise<Response>
+  handler: (req: NextRequest, access: Access, prisma: PrismaClient, ctx: Ctx<P>) => Promise<Response>,
+  /** `cacheMs`: keep the JSON of successful GETs for this long (per organization and URL). `?fresh=1` bypasses it. */
+  options: { cacheMs?: number } = {}
 ) {
   return async (req: NextRequest, ctx: Ctx<P>): Promise<Response> => {
     let prisma: PrismaClient | null = null;
@@ -32,15 +35,35 @@ export function guard<P = Record<string, never>>(
       if (result.status === 'forbidden') return json({ error: 'Forbidden' }, 403);
       if (permission && !can(result.access.role, permission)) return json({ error: 'Forbidden' }, 403);
 
-      prisma = getPrisma();
-      try {
-        return await handler(req, result.access, prisma, ctx);
-      } catch (first) {
-        // A sleeping free-tier database or a cold Worker can fail the very first query. Reads are safe to repeat once.
-        if (req.method !== 'GET' || (first as { digest?: string })?.digest) throw first;
-        await new Promise((r) => setTimeout(r, 400));
-        return await handler(req, result.access, prisma, ctx);
+      // Reads share one long-lived HTTP client; writes get a per-request client that supports transactions.
+      prisma = req.method === 'GET' ? getReadPrisma() : getPrisma();
+      const run = async () => {
+        try {
+          return await handler(req, result.access, prisma!, ctx);
+        } catch (first) {
+          // A sleeping free-tier database or a cold Worker can fail the very first query. Reads are safe to repeat once.
+          if (req.method !== 'GET' || (first as { digest?: string })?.digest) throw first;
+          await new Promise((r) => setTimeout(r, 400));
+          return await handler(req, result.access, prisma!, ctx);
+        }
+      };
+
+      if (req.method === 'GET' && options.cacheMs) {
+        const url = new URL(req.url);
+        const fresh = url.searchParams.get('fresh') === '1';
+        url.searchParams.delete('fresh');
+        url.searchParams.sort();
+        const out = await cached(result.access.organizationId, `${permission ?? 'any'}:${url.pathname}`, url.searchParams.toString(), options.cacheMs, fresh, async () => {
+          const res = await run();
+          return { status: res.status, body: await res.text() };
+        });
+        return new Response(out.body, { status: out.status, headers: { 'Content-Type': 'application/json', ...NO_STORE } });
       }
+
+      const res = await run();
+      // A successful write changes what the cached reads should say: drop this organization's entries now.
+      if (req.method !== 'GET' && res.status < 400) invalidateOrg(result.access.organizationId);
+      return res;
     } catch (e) {
       // Let Next.js's own control-flow signals through (e.g. prerender bail-out).
       if ((e as { digest?: string })?.digest) throw e;
@@ -48,7 +71,7 @@ export function guard<P = Record<string, never>>(
       console.error('API error:', e instanceof Error ? e.name : 'Error', (e as { code?: string })?.code ?? '');
       return json({ error: 'Internal error' }, 500);
     } finally {
-      if (prisma && isWorkers()) await prisma.$disconnect().catch(() => {});
+      await release(prisma);
     }
   };
 }

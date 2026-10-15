@@ -31,11 +31,17 @@ export default function NotificationBell() {
   useEffect(() => {
     if (!allowed) return;
     const c = new AbortController();
-    fetch('/api/alerts/count', { signal: c.signal, cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setCounts(d as Counts))
-      .catch(() => {});
-    return () => c.abort();
+    // Not needed for the first paint: ask a moment later so the page's own data gets the server first.
+    const timer = window.setTimeout(() => {
+      fetch(`/api/alerts/count${version > 0 ? '?fresh=1' : ''}`, { signal: c.signal, cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => d && setCounts(d as Counts))
+        .catch(() => {});
+    }, version > 0 ? 0 : 1500);
+    return () => {
+      window.clearTimeout(timer);
+      c.abort();
+    };
   }, [allowed, version]);
 
   useEffect(() => {

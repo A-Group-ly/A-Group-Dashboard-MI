@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { useApp } from '@/components/providers/AppProvider';
 import { useApiData } from '@/components/providers/useApiData';
 import { ApiGate, Card, DemoNotice, Money, PageHeader } from '@/components/ui/primitives';
-import MonthlyReport from '@/components/reports/MonthlyReport';
+import dynamic from 'next/dynamic';
+const MonthlyReport = dynamic(() => import('@/components/reports/MonthlyReport'), { loading: () => <div className="skeleton h-96" /> });
 import ScopeBar from '@/components/ScopeBar';
 import ExportCsvButton from '@/components/ExportCsvButton';
 

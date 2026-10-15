@@ -26,6 +26,7 @@ export async function apiSend<T = unknown>(method: 'POST' | 'PATCH' | 'PUT' | 'D
       cache: 'no-store',
     });
     const json = (await res.json().catch(() => null)) as (T & { error?: string; fields?: Record<string, string> }) | null;
+    if (res.ok) window.dispatchEvent(new Event('ag:data-changed'));
     return { ok: res.ok, status: res.status, data: res.ok ? (json as T) : null, error: res.ok ? null : (json?.error ?? null), fields: (!res.ok && json?.fields) || {} };
   } catch {
     return { ok: false, status: 0, data: null, error: null, fields: {} };
