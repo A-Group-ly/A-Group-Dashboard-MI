@@ -25,6 +25,9 @@ export interface ApiTransaction {
   platform: { id: string; name: string; code: string } | null;
   account: { id: string; name: string; type: string; currency: string } | null;
   accountId: string | null;
+  reference?: string | null;
+  dueDate?: string | null;
+  platformId?: string | null;
 }
 
 export const PLATFORM_BY_CODE: Record<string, PlatformSource> = {

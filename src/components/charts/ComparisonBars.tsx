@@ -61,7 +61,7 @@ export default function ComparisonBars({ title, items, currency, increaseIs, cur
                 aria-label={`${it.label}: ${currentLabel} ${formatCurrency(it.current, currency)}, ${previousLabel} ${formatCurrency(it.previous, currency)}`}
               >
                 <div className="mb-1.5 flex items-baseline justify-between gap-3 text-xs">
-                  <span className="min-w-0 truncate font-semibold text-ink" title={it.label}>
+                  <span className="min-w-0 break-words font-semibold text-ink" title={it.label}>
                     {it.label}
                   </span>
                   <span dir="ltr" className={`shrink-0 font-bold tabular-nums ${tone}`}>

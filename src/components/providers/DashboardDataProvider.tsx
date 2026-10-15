@@ -2,9 +2,11 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { FinancialOverview } from '@/types/dashboard';
-import type { BreakdownItem, SeriesPoint } from '@/lib/server/finance';
+import type { BreakdownItem, PlatformSummary, SeriesPoint } from '@/lib/server/finance';
 import type { Range } from '@/lib/period';
-import { useApp } from './AppProvider';
+import { useApp, useCurrencyScope } from './AppProvider';
+import { PLATFORM_BY_CODE } from '@/lib/mapApi';
+import type { Currency } from '@/types/dashboard';
 
 export type DataStatus = 'loading' | 'refreshing' | 'ok' | 'error';
 
@@ -26,8 +28,19 @@ export interface FinancialPositionData {
   upcomingPayablesCount: number;
 }
 
+export interface MonthSpendingData {
+  monthStart: string;
+  monthEnd: string;
+  spentToDate: number;
+  spentCount: number;
+  scheduledToMonthEnd: number;
+  scheduledCount: number;
+  projected: number;
+  budgetCap: number;
+  budgetConfigured: boolean;
+}
+
 export interface OverviewBundle {
-  key: string;
   range: Range;
   previousRange: Range;
   overview: FinancialOverview;
@@ -35,10 +48,30 @@ export interface OverviewBundle {
   series: { bucket: 'day' | 'week' | 'month'; points: SeriesPoint[] };
   breakdown: { expensesByCategory: BreakdownItem[]; incomeByPlatform: BreakdownItem[] };
   position: FinancialPositionData;
+  spending: MonthSpendingData;
+  platforms: PlatformSummary[];
 }
 
-interface DashboardDataValue {
-  data: OverviewBundle | null;
+type ByCurrency = Record<Currency, OverviewBundle>;
+export interface PulseData {
+  customers: number;
+  activeCustomers: number;
+  newCustomers: number;
+  subscriptions: { active: number; trial: number; pastDue: number; paused: number };
+  mrr: Record<Currency, number>;
+}
+
+interface Loaded {
+  key: string;
+  currencies: ByCurrency;
+  pulse: PulseData;
+}
+
+interface DashboardState {
+  /** Both currencies, side by side. */
+  all: ByCurrency | null;
+  /** Headline counters (customers, subscriptions, MRR). */
+  pulse: PulseData | null;
   /** True while there is nothing to show yet for the current scope. */
   loading: boolean;
   status: DataStatus;
@@ -52,7 +85,12 @@ interface DashboardDataValue {
   refresh: () => void;
 }
 
-const Ctx = createContext<DashboardDataValue | null>(null);
+const Ctx = createContext<DashboardState | null>(null);
+
+/** What consumers see: the state plus the data of the enclosing <CurrencyScope> currency (LYD outside any scope). */
+export interface DashboardDataValue extends DashboardState {
+  data: OverviewBundle | null;
+}
 
 class HttpError extends Error {
   constructor(public status: number) {
@@ -61,10 +99,11 @@ class HttpError extends Error {
 }
 
 export function DashboardDataProvider({ children }: { children: React.ReactNode }) {
-  const { range, previous, currency, refreshSeconds } = useApp();
-  const key = `${range.from}|${range.to}|${currency}`;
+  const { range, previous, refreshSeconds, platform } = useApp();
+  const platformCode = platform === 'all' ? '' : (Object.entries(PLATFORM_BY_CODE).find(([, label]) => label === platform)?.[0] ?? '');
+  const key = `${range.from}|${range.to}|${platformCode}`;
 
-  const [data, setData] = useState<OverviewBundle | null>(null);
+  const [data, setData] = useState<Loaded | null>(null);
   const [status, setStatus] = useState<DataStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
@@ -92,14 +131,14 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
         to: range.to,
         prevFrom: previous.from,
         prevTo: previous.to,
-        currency,
       });
+      if (platformCode) qs.set('platform', platformCode);
       const res = await fetch(`/api/overview?${qs}`, { signal: controller.signal, cache: 'no-store' });
       if (!res.ok) throw new HttpError(res.status);
       const body = await res.json();
       if (id !== requestId.current) return;
       const now = Date.now();
-      setData({ key, ...body });
+      setData({ key, currencies: body.currencies, pulse: body.pulse });
       lastSuccessRef.current = now;
       setLastSuccessAt(now);
       setError(null);
@@ -114,7 +153,7 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
     } finally {
       if (inFlight.current === controller) inFlight.current = null;
     }
-  }, [range.from, range.to, previous.from, previous.to, currency, key]);
+  }, [range.from, range.to, previous.from, previous.to, platformCode, key]);
 
   // Scope change: cancel the old request and load for the new scope.
   useEffect(() => {
@@ -148,11 +187,13 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
   }, [refreshSeconds, load]);
 
   // Only data that belongs to the current scope is shown; stale scope data is never presented as current.
-  const usable = data && data.key === key ? data : null;
+  const usable = data && data.key === key ? data.currencies : null;
+  const pulse = data && data.key === key ? data.pulse : null;
 
-  const value = useMemo<DashboardDataValue>(
+  const value = useMemo<DashboardState>(
     () => ({
-      data: usable,
+      all: usable,
+      pulse,
       loading: usable === null && status !== 'error',
       status,
       errorStatus,
@@ -162,7 +203,7 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
       version,
       refresh: () => void load(),
     }),
-    [usable, status, errorStatus, error, lastSuccessAt, lastAttemptAt, version, load]
+    [usable, pulse, status, errorStatus, error, lastSuccessAt, lastAttemptAt, version, load]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -170,6 +211,7 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
 
 export function useDashboardData(): DashboardDataValue {
   const ctx = useContext(Ctx);
+  const scope = useCurrencyScope();
   if (!ctx) throw new Error('useDashboardData must be used inside <DashboardDataProvider>');
-  return ctx;
+  return { ...ctx, data: ctx.all ? ctx.all[scope] : null };
 }

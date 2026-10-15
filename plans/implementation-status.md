@@ -3,21 +3,20 @@
 Updated 2026-10-15.
 
 ## Done
-- Neon database: tenancy, roles, customers, products, plans, subscriptions, invoices, simulated payments, finance tables; migrated and seeded with fictional data.
-- All pages and APIs read from the database (tenant-scoped, aggregated in SQL). No mock data in the app.
-- Clerk authentication: every page and API route protected (proxy + per-route check, fails closed); webhook with signature verification.
-- Roles ADMIN / FINANCE / ANALYST / READ_ONLY enforced on the API; role shown informationally in the account menu; admin user management.
-- Period filters (day/week/month/quarter/half/custom) with automatic previous-period comparison; line, bar and donut charts; financial position (paid, outstanding, expected by month end) first on the overview.
-- EN/AR with RTL, brand name stays Latin, light/dark, mobile layouts, hover transitions, CSV export, monthly report.
-- Cloudflare Workers deployment (OpenNext), CI (PR checks) and deploy workflows, README, `.env.example`.
-- Unit tests: 23 (periods, billing, permissions, dev harness gating, csv, mapping).
+- Neon database, tenant-scoped data, Clerk auth on every page and API route, roles and permissions enforced on the API.
+- Overview shows USD (left) and LYD (right) side by side; each has financial position, month spending (spent so far, still to pay, expected total by month end vs budget), KPIs, charts, comparisons.
+- Server-side search / filter / sort / pagination for customers, subscriptions, invoices, transactions, audit log; billing and finance numbers are SQL aggregates (no row loading), verified equal to the reference calculations.
+- Write workflows (all validated, audited, atomic): customers (add, edit, deactivate), subscriptions (add, pause, resume, cancel), invoices (issue, void), simulated payments, transactions (add, edit, delete), budgets, plans / products, users (role, activate / deactivate).
+- Audit log (admin), CSV exports, toasts, bilingual forms, mobile bottom-sheet dialogs.
+- Deterministic 2,000-customer synthetic dataset generator + validator + guarded database writer.
+- Cloudflare Workers deployment, CI and deploy workflows.
 
-## Needs the owner
-- Sign in once (first user becomes ADMIN); restrict sign-up in Clerk; register the Clerk webhook at `/api/webhooks/clerk`; allow the Worker URL in Clerk.
-- Set GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`.
-- Provide the official logo SVG and A-Market / A-Space brand colours.
+## Pending the owner's approval (database changes)
+- Apply migration `20261015120000_audit_log` (adds the `AuditLog` table) to Neon.
+- Run the demo-scale seed against Neon, then verify the UI on the generated data and redeploy.
 
 ## Not done / risks
-- Signed-in flows on the deployed Worker were not exercised by automation (needs a real Clerk session).
-- Free-plan Worker CPU limit (10 ms per request) may be tight; watch `observability` logs.
-- Create/edit workflows, TV mode, real payment processing: out of scope.
+- Signed-in flows on the deployed Worker are not automated (needs a real Clerk session).
+- Free-plan Worker CPU limit (10 ms per request) may be tight; watch the observability logs.
+- No Arabic name field exists on customers (the Arabic name is kept in the notes); adding `displayNameAr` needs a migration.
+- Partial payments, TV mode, real payment processing: out of scope.

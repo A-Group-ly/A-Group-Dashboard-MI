@@ -3,15 +3,17 @@
 import React, { useState } from 'react';
 import { useApp } from '@/components/providers/AppProvider';
 import { useAccess } from '@/components/providers/AccessProvider';
-import { mapApiTransaction, type ApiTransaction } from '@/lib/mapApi';
-import { downloadCsv, transactionsToCsv } from '@/lib/csv';
+import { PLATFORM_BY_CODE } from '@/lib/mapApi';
+
+const CODE_BY_PLATFORM = Object.fromEntries(Object.entries(PLATFORM_BY_CODE).map(([code, label]) => [label, code]));
 
 /**
- * Exports exactly what the filters select (period, currency, platform). The server re-checks the
- * "export:csv" permission and the tenant on the request; the button is hidden for roles without it.
+ * Downloads the transactions of the selected period (and platform) as CSV, built on the server from the same
+ * tenant-scoped query as the tables. Both currencies are included; every row keeps its own currency.
+ * The server re-checks the "export:csv" permission; the button is hidden for roles without it.
  */
 export default function ExportCsvButton() {
-  const { t, range, currency, platform } = useApp();
+  const { t, range, platform } = useApp();
   const { can } = useAccess();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -22,12 +24,18 @@ export default function ExportCsvButton() {
     setBusy(true);
     setFailed(false);
     try {
-      const qs = new URLSearchParams({ from: range.from, to: range.to, currency, limit: '200' });
+      const qs = new URLSearchParams({ from: range.from, to: range.to, format: 'csv', sort: 'date', dir: 'desc' });
+      if (platform !== 'all' && CODE_BY_PLATFORM[platform]) qs.set('platform', CODE_BY_PLATFORM[platform]);
       const res = await fetch(`/api/transactions?${qs}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('export failed');
-      const body = (await res.json()) as { data: ApiTransaction[] };
-      const rows = body.data.map(mapApiTransaction).filter((tx) => platform === 'all' || tx.source === platform);
-      downloadCsv(`a-group-transactions-${range.from}_${range.to}-${currency}.csv`, transactionsToCsv(rows));
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `a-group-transactions-${range.from}_${range.to}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
       setFailed(true);
     } finally {

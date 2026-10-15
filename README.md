@@ -18,14 +18,33 @@ Tailwind 4, Prisma 5 on Neon PostgreSQL, Clerk authentication, deployed to Cloud
 - Light/dark theme, English/Arabic with RTL (the brand name "A-Group" stays Latin in Arabic), mobile friendly,
   CSV export, printable monthly report.
 
+## Working features (beyond reading)
+
+Add / edit / deactivate customers, start / pause / resume / cancel subscriptions, create plans and products (admin),
+issue and void invoices, record **simulated** payments (books the matching income transaction atomically), add / edit /
+delete transactions, set monthly budgets, activate / deactivate users, CSV export of customers / subscriptions /
+invoices / transactions (server-side, same filters as the table), server-side search / filter / sort / pagination for
+large lists, an admin **audit log** of every change, toast feedback and validated forms (English / Arabic).
+USD and LYD are always shown side by side (USD left, LYD right) and never combined.
+
+## Quality-of-life features
+
+Global search (Ctrl/Cmd+K or `/`) over customers, subscriptions, invoices and pages; keyboard shortcuts (`?` lists them,
+`g` then `o/c/s/i/t/b/r/a/v` jumps to a page); notification bell with the number of urgent items; business-pulse strip
+(customers, subscriptions, MRR per currency); action center and recent-activity feed; **TV mode** (`/tv`, rotating
+wallboard with auto refresh, hide-amounts privacy toggle and full screen); saved views (period + platform); customizable
+overview (show/hide sections); compact/comfortable density; rows-per-page selector; copy buttons for ids, emails and
+invoice numbers; customer health badge, lifetime summary and activity timeline; simulated payment reminders for overdue
+invoices (recorded in the audit log, nothing is sent); empty-state call-to-action buttons.
+
 ## Roles
 
 | Role | Can view |
 |---|---|
 | READ_ONLY | Overview, settings |
-| ANALYST | + transactions, budgets, reports, CSV export |
-| FINANCE | + customers, subscriptions, alerts |
-| ADMIN | + organizations, user management (change roles) |
+| ANALYST | + transactions, budgets, reports, CSV export (view only) |
+| FINANCE | + customers, subscriptions, invoices, alerts, and all create / edit / record-payment actions |
+| ADMIN | + organizations, plan catalog, user management, audit log |
 
 The **first user to sign in becomes ADMIN**; everyone after starts as READ_ONLY. An admin changes roles in
 Settings → Users. The last admin cannot be demoted.
@@ -42,6 +61,22 @@ npm run dev                      # http://localhost:3000
 ```
 
 Environment variable names are listed in `.env.example` (placeholders only). Secrets are never in the code.
+
+## Synthetic demo dataset (2,000 customers)
+
+Deterministic and fictional (fixed seed, reserved `example.com` emails, non-assignable phone block, clearly labelled).
+Segments: 1,200 individual, 500 small business, 200 medium, 80 enterprise, 20 public-sector demonstration entities.
+No new models are needed; it reuses the existing customers, organizations, subscriptions, invoices, simulated payments
+and financial transactions.
+
+```bash
+npm run demo:validate                       # offline check: counts, foreign keys, reconciliation (no database)
+npm run demo:scale                          # dry run against your .env database: writes nothing
+npm run demo:scale -- --confirm             # additive, idempotent write (never modifies or deletes existing rows)
+ALLOW_DEMO_RESET=true npm run demo:scale -- --reset-demo --confirm   # removes only "-demo-" rows, then rewrites
+```
+
+Run `npx prisma migrate deploy` first (adds the audit-log table) and the base seed (`npx prisma db seed`).
 
 ## Scripts
 

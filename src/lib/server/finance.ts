@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type { Currency, FinancialOverview, PaymentChannelBreakdown } from '@/types/dashboard';
 import { calculateMoM } from '../calculations';
+import { endOfMonth } from '../billing';
 import { PLATFORM_BY_CODE } from '../mapApi';
 import {
   bucketFor,
@@ -13,8 +14,9 @@ import {
 } from '../period';
 
 /**
- * Finance aggregations. Everything is computed by PostgreSQL (GROUP BY / SUM on Decimal(19,4)) and only
- * the final totals are converted to JSON numbers. Every query is scoped by organizationId.
+ * Reference implementation of the finance aggregations (one readable query per metric, per currency).
+ * The app runs financeSql.ts, which produces identical numbers in ~7 statements for both currencies (verified
+ * range by range against this file). This file still owns the shared result types and documents the rules.
  */
 
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -246,4 +248,88 @@ export async function financeBreakdown(prisma: PrismaClient, orgId: string, curr
 
   const sort = (m: Map<string, BreakdownItem>) => [...m.values()].sort((a, b) => b.current + b.previous - (a.current + a.previous));
   return { expensesByCategory: sort(expensesByCategory), incomeByPlatform: sort(incomeByPlatform) };
+}
+
+/**
+ * Spending for the calendar month that contains `today`: what has been paid out so far, what is already
+ * scheduled (UPCOMING / PENDING expenses) up to month end, and the resulting projected month total.
+ */
+export async function monthSpending(prisma: PrismaClient, orgId: string, currency: Currency, today: string) {
+  const monthStart = `${today.slice(0, 8)}01`;
+  const monthEnd = endOfMonth(today);
+  const base = { organizationId: orgId, currency, type: 'EXPENSE' as const };
+  const [paid, scheduled, cap] = await Promise.all([
+    prisma.financialTransaction.aggregate({
+      where: { ...base, status: 'PAID', transactionDate: { gte: d(monthStart), lte: d(monthEnd) } },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+    prisma.financialTransaction.aggregate({
+      where: { ...base, status: { in: ['UPCOMING', 'PENDING'] }, transactionDate: { lte: d(monthEnd) } },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+    budgetCap(prisma, orgId, currency, { from: monthStart, to: monthEnd }),
+  ]);
+  const spentToDate = n(paid._sum.amount);
+  const scheduledToMonthEnd = n(scheduled._sum.amount);
+  return {
+    monthStart,
+    monthEnd,
+    spentToDate,
+    spentCount: paid._count._all,
+    scheduledToMonthEnd,
+    scheduledCount: scheduled._count._all,
+    projected: spentToDate + scheduledToMonthEnd,
+    budgetCap: cap.configured ? cap.cap : 0,
+    budgetConfigured: cap.configured,
+  };
+}
+
+export interface PlatformSummary {
+  code: string;
+  name: string;
+  income: number;
+  incomeCount: number;
+  expense: number;
+  expenseCount: number;
+  topIncome: { category: string; categoryAr: string; amount: number } | null;
+  topExpense: { category: string; categoryAr: string; amount: number } | null;
+}
+
+/** Per-platform income / expense totals with the largest category of each (one grouped query). */
+export async function platformSummary(prisma: PrismaClient, orgId: string, currency: Currency, range: Range): Promise<PlatformSummary[]> {
+  const [rows, platforms] = await Promise.all([
+    prisma.financialTransaction.groupBy({
+      by: ['platformId', 'type', 'category', 'categoryAr'],
+      where: {
+        organizationId: orgId,
+        currency,
+        transactionDate: { gte: d(range.from), lte: d(range.to) },
+        OR: [{ type: 'INCOME', status: { not: 'UPCOMING' } }, { type: 'EXPENSE', status: 'PAID' }],
+      },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+    prisma.platform.findMany({ where: { organizationId: orgId }, select: { id: true, name: true, code: true } }),
+  ]);
+  const map = new Map<string, PlatformSummary>();
+  for (const r of rows) {
+    const p = platforms.find((x) => x.id === r.platformId);
+    const code = p?.code ?? 'UNASSIGNED';
+    const s = map.get(code) ?? { code, name: (p && PLATFORM_BY_CODE[p.code]) || p?.name || 'Unassigned', income: 0, incomeCount: 0, expense: 0, expenseCount: 0, topIncome: null, topExpense: null };
+    const amount = n(r._sum.amount);
+    const cat = { category: r.category, categoryAr: r.categoryAr ?? r.category, amount };
+    if (r.type === 'INCOME') {
+      s.income += amount;
+      s.incomeCount += r._count._all;
+      if (!s.topIncome || amount > s.topIncome.amount) s.topIncome = cat;
+    } else {
+      s.expense += amount;
+      s.expenseCount += r._count._all;
+      if (!s.topExpense || amount > s.topExpense.amount) s.topExpense = cat;
+    }
+    map.set(code, s);
+  }
+  return [...map.values()].sort((a, b) => b.income - a.income);
 }

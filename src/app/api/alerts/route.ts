@@ -1,6 +1,7 @@
-import { badRequest, guard, json, parseCurrency, parseRanges, todayIso } from '@/lib/server/guard';
-import { financeOverview } from '@/lib/server/finance';
+import { badRequest, guard, json, parseRanges, todayIso } from '@/lib/server/guard';
+import { budgetUsage } from '@/lib/server/financeSql';
 import { addDays, diffDays } from '@/lib/period';
+import { recentActivity } from '@/lib/server/activity';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,17 +65,18 @@ export const GET = guard('alerts:view', async (req, access, prisma) => {
     items.push({ id: `ren-${s.id}`, severity: 'low', type: 'renewalDue', date: iso(s.nextRenewal), label: s.id, customerName: s.customer.displayName, amount: null, currency: null, detail: `${s.plan.name} · ${diffDays(today, iso(s.nextRenewal))}d`, href: `/subscriptions/${s.id}` });
   }
 
-  // Budget rule for the selected period / currency (optional parameters).
-  const currency = parseCurrency(sp.get('currency'));
-  if (sp.get('from') && currency) {
+  // Budget rule for the selected period, evaluated separately for each currency (two small queries in total).
+  if (sp.get('from')) {
     const ranges = parseRanges(sp);
     if (!ranges) return badRequest('Invalid period');
-    const { overview, meta } = await financeOverview(prisma, org, currency, ranges.range, ranges.prev);
-    const spent = overview.totalExpenses.current;
-    if (meta.budgetConfigured && meta.budgetCap > 0) {
-      const pct = (spent / meta.budgetCap) * 100;
-      if (pct >= 80) {
-        items.push({ id: 'budget', severity: pct > 100 ? 'high' : 'medium', type: pct > 100 ? 'budgetOver' : 'budgetNear', date: ranges.range.from, label: currency, customerName: null, amount: spent, currency, detail: `${pct.toFixed(0)}%`, href: '/budgets' });
+    const usage = await budgetUsage(prisma, org, ranges.range);
+    for (const currency of ['USD', 'LYD'] as const) {
+      const { spent, cap, configured } = usage[currency];
+      if (configured && cap > 0) {
+        const pct = (spent / cap) * 100;
+        if (pct >= 80) {
+          items.push({ id: `budget-${currency}`, severity: pct > 100 ? 'high' : 'medium', type: pct > 100 ? 'budgetOver' : 'budgetNear', date: ranges.range.from, label: currency, customerName: null, amount: spent, currency, detail: `${pct.toFixed(0)}%`, href: '/budgets' });
+        }
       }
     }
   }
@@ -82,20 +84,7 @@ export const GET = guard('alerts:view', async (req, access, prisma) => {
   const order: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
   items.sort((a, b) => order[a.severity] - order[b.severity] || b.date.localeCompare(a.date));
 
-  // Recent activity (informational, not a security audit log).
-  const [subs, invs, pays] = await Promise.all([
-    prisma.subscription.findMany({ where: { organizationId: org, startDate: { lte: new Date(`${today}T00:00:00Z`) } }, select: { id: true, startDate: true, canceledDate: true, customer: { select: { displayName: true } } }, orderBy: { startDate: 'desc' }, take: 12 }),
-    prisma.invoice.findMany({ where: { organizationId: org, status: { in: ['ISSUED', 'PAID'] }, issueDate: { lte: new Date(`${today}T00:00:00Z`) } }, select: { number: true, status: true, issueDate: true, customerId: true }, orderBy: { issueDate: 'desc' }, take: 12 }),
-    prisma.billingPayment.findMany({ where: { organizationId: org, date: { lte: new Date(`${today}T00:00:00Z`) } }, select: { id: true, status: true, date: true, customerId: true, invoice: { select: { number: true } } }, orderBy: { date: 'desc' }, take: 12 }),
-  ]);
-  const activity = [
-    ...subs.map((s) => ({ date: iso(s.startDate), kind: 'subscriptionCreated', ref: s.id, customerName: s.customer.displayName, status: null as string | null, href: `/subscriptions/${s.id}` })),
-    ...subs.filter((s) => s.canceledDate).map((s) => ({ date: iso(s.canceledDate), kind: 'subscriptionCanceled', ref: s.id, customerName: s.customer.displayName, status: null, href: `/subscriptions/${s.id}` })),
-    ...invs.map((i) => ({ date: iso(i.issueDate), kind: 'invoice', ref: i.number, customerName: null, status: i.status.toLowerCase(), href: `/customers/${i.customerId}` })),
-    ...pays.map((p) => ({ date: iso(p.date), kind: 'payment', ref: p.invoice.number, customerName: null, status: p.status.toLowerCase(), href: `/customers/${p.customerId}` })),
-  ]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 14);
+  const activity = await recentActivity(prisma, org, today, 14);
 
   return json({ asOf: today, alerts: items, activity });
 });

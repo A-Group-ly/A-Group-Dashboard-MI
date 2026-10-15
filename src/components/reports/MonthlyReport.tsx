@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '@/components/providers/AppProvider';
 import { useDashboardData } from '@/components/providers/DashboardDataProvider';
-import { useTransactions } from '@/components/providers/useTransactions';
+import { useApiData } from '@/components/providers/useApiData';
+import { mapApiTransaction, type ApiTransaction } from '@/lib/mapApi';
 import { formatCurrency } from '@/lib/calculations';
 import { formatRange } from '@/lib/period';
-import { PLATFORMS, monthInNumbers, pctChange } from '@/lib/analytics';
+import { monthInNumbers, pctChange } from '@/lib/analytics';
 import { ErrorState, PageSkeleton } from '@/components/ui/primitives';
-import type { Transaction } from '@/types/dashboard';
+import type { Currency, Transaction } from '@/types/dashboard';
 
 /* ---------- draft (manager-written text, kept in this browser only) ---------- */
 
@@ -59,9 +60,12 @@ function Pill({ children }: { children: React.ReactNode }) {
 }
 
 export default function MonthlyReport() {
-  const { t, tr, lang, range, previous, period, currency } = useApp();
-  const { data, loading, error, refresh } = useDashboardData();
-  const tx = useTransactions(200);
+  const { t, tr, lang, range, previous, period } = useApp();
+  const { all, loading, error, refresh } = useDashboardData();
+  // Items still to be paid (pending / upcoming) in the period: a small, server-filtered list. Totals never come from rows.
+  const pendingState = useApiData<{ data: ApiTransaction[]; total: number }>(
+    `/api/transactions?${new URLSearchParams({ from: range.from, to: range.to, status: 'PENDING,UPCOMING', pageSize: '100', sort: 'date', dir: 'asc' })}`
+  );
   const draftKey = `ag_report_draft_v2_${range.from}_${range.to}`;
 
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -94,73 +98,73 @@ export default function MonthlyReport() {
       return next;
     });
 
-  const overview = data?.overview;
-  const rows = useMemo(() => (overview ? monthInNumbers(overview, currency) : []), [overview, currency]);
-
   if (loading) return <PageSkeleton />;
-  if (!data || !overview) return <ErrorState message={error ?? t('err.server')} onRetry={refresh} />;
+  if (!all) return <ErrorState message={error ?? t('err.server')} onRetry={refresh} />;
 
-  const fmt = (n: number) => formatCurrency(n, currency);
   const na = t('cmp.na');
   const periodText = formatRange(range, lang, period.granularity);
   const prevText = formatRange(previous, lang, period.granularity === 'custom' ? undefined : period.granularity);
-  const cap = data.meta.budgetCap;
-  const budgetPct = data.meta.budgetConfigured && cap > 0 ? (overview.totalExpenses.current / cap) * 100 : null;
-
-  /* ---- executive summary (derived from the data only) ---- */
-  const netChange = pctChange(overview.netResult.current, overview.netResult.previous);
-  const incomeChange = pctChange(overview.totalIncome.current, overview.totalIncome.previous);
-  const expChange = pctChange(overview.totalExpenses.current, overview.totalExpenses.previous);
-  const headline = `${t('mr.headlineNet')} ${fmt(overview.netResult.current)} ${netChange === null ? `(${t('mr.noComparison')})` : pctText(netChange, na)}`;
-  const resultsLine = `${tr.kpiIncome}: ${fmt(overview.totalIncome.current)} ${t('scope.vs')} ${fmt(overview.totalIncome.previous)} ${pctText(incomeChange, na)} · ${tr.kpiExpenses}: ${fmt(
-    overview.totalExpenses.current
-  )} ${t('scope.vs')} ${fmt(overview.totalExpenses.previous)} ${pctText(expChange, na)}`;
-
-  const autoProblems: string[] = [];
-  if (budgetPct !== null && budgetPct > 100) autoProblems.push(`${t('mr.negBudgetOver')} (${budgetPct.toFixed(0)}%)`);
-  else if (budgetPct !== null && budgetPct >= 80) autoProblems.push(`${t('mr.negBudgetNear')} (${budgetPct.toFixed(0)}%)`);
-  if (data.position.overdueCount > 0) autoProblems.push(`${t('status.overdue')}: ${fmt(data.position.overdue)} (${data.position.overdueCount})`);
-  if (overview.pendingIncomeTotal > 0) autoProblems.push(`${t('mr.negPending')}: ${fmt(overview.pendingIncomeTotal)}`);
-
-  const positives: string[] = [];
-  const negatives: string[] = [...autoProblems];
-  if (incomeChange !== null) (incomeChange >= 0 ? positives : negatives).push(incomeChange >= 0 ? t('mr.posIncomeUp') : t('mr.negIncomeDown'));
-  if (expChange !== null) (expChange <= 0 ? positives : negatives).push(expChange <= 0 ? t('mr.posExpDown') : t('mr.negExpUp'));
-  if (budgetPct !== null && budgetPct < 80) positives.push(t('mr.posBudgetOk'));
-
-  /* ---- delivered, per platform (current from transactions, previous from the server comparison) ---- */
-  const txRows: Transaction[] = tx.rows ?? [];
-  const previousIncomeByPlatform = new Map(data.breakdown.incomeByPlatform.map((b) => [b.label, b.previous]));
-  const delivered = PLATFORMS.map((p) => {
-    const cur = txRows.filter((x) => x.source === p);
-    const inc = cur.filter((x) => x.type === 'inflow' && x.status !== 'upcoming');
-    const exp = cur.filter((x) => x.type === 'outflow' && x.status === 'paid');
-    const sum = (list: Transaction[]) => list.reduce((s, x) => s + x.amount, 0);
-    const top = (list: Transaction[]) => {
-      const m = new Map<string, number>();
-      for (const x of list) {
-        const k = lang === 'ar' ? x.categoryAr : x.category;
-        m.set(k, (m.get(k) ?? 0) + x.amount);
-      }
-      return [...m.entries()].sort((a, b) => b[1] - a[1])[0];
-    };
-    return { p, n: cur.length, incNow: sum(inc), incPrev: previousIncomeByPlatform.get(p) ?? 0, expNow: sum(exp), nInc: inc.length, nExp: exp.length, topInc: top(inc), topExp: top(exp) };
-  }).filter((d) => d.n > 0);
-
-  /* ---- carried over: anything not yet paid in the period ---- */
-  const carried = txRows.filter((x) => x.status !== 'paid').sort((a, b) => a.date.localeCompare(b.date));
+  const txAll: Transaction[] = pendingState.data ? pendingState.data.data.map(mapApiTransaction) : [];
   const statusLabel = (s: string) => (s === 'upcoming' ? tr.statusUpcoming : tr.statusPending);
 
-  const sourceRows: [string, number][] = [
-    [tr.kpiIncome, overview.totalIncome.current],
-    [tr.kpiExpenses, overview.totalExpenses.current],
-    [tr.kpiNetResult, overview.netResult.current],
-    [tr.kpiCashCollected, overview.cashCollected.current],
-    [tr.kpiPendingIncome, overview.pendingIncomeTotal],
-    [tr.upcomingObligations, overview.upcomingObligationsTotal],
-    [t('pos.paid'), data.position.paid],
-    [t('pos.outstanding'), data.position.outstanding],
-  ];
+  /** Everything the report says about ONE currency. Currencies are never combined. */
+  const build = (cur: Currency) => {
+    const data = all[cur];
+    const overview = data.overview;
+    const fmt = (n: number) => formatCurrency(n, cur);
+    const rows = monthInNumbers(overview, cur);
+    const cap = data.meta.budgetCap;
+    const budgetPct = data.meta.budgetConfigured && cap > 0 ? (overview.totalExpenses.current / cap) * 100 : null;
+
+    const netChange = pctChange(overview.netResult.current, overview.netResult.previous);
+    const incomeChange = pctChange(overview.totalIncome.current, overview.totalIncome.previous);
+    const expChange = pctChange(overview.totalExpenses.current, overview.totalExpenses.previous);
+    const headline = `${t('mr.headlineNet')} ${fmt(overview.netResult.current)} ${netChange === null ? `(${t('mr.noComparison')})` : pctText(netChange, na)}`;
+    const resultsLine = `${tr.kpiIncome}: ${fmt(overview.totalIncome.current)} ${t('scope.vs')} ${fmt(overview.totalIncome.previous)} ${pctText(incomeChange, na)} · ${tr.kpiExpenses}: ${fmt(
+      overview.totalExpenses.current
+    )} ${t('scope.vs')} ${fmt(overview.totalExpenses.previous)} ${pctText(expChange, na)}`;
+
+    const autoProblems: string[] = [];
+    if (budgetPct !== null && budgetPct > 100) autoProblems.push(`${t('mr.negBudgetOver')} (${budgetPct.toFixed(0)}%)`);
+    else if (budgetPct !== null && budgetPct >= 80) autoProblems.push(`${t('mr.negBudgetNear')} (${budgetPct.toFixed(0)}%)`);
+    if (data.position.overdueCount > 0) autoProblems.push(`${t('status.overdue')}: ${fmt(data.position.overdue)} (${data.position.overdueCount})`);
+    if (overview.pendingIncomeTotal > 0) autoProblems.push(`${t('mr.negPending')}: ${fmt(overview.pendingIncomeTotal)}`);
+
+    const positives: string[] = [];
+    const negatives: string[] = [...autoProblems];
+    if (incomeChange !== null) (incomeChange >= 0 ? positives : negatives).push(incomeChange >= 0 ? t('mr.posIncomeUp') : t('mr.negIncomeDown'));
+    if (expChange !== null) (expChange <= 0 ? positives : negatives).push(expChange <= 0 ? t('mr.posExpDown') : t('mr.negExpUp'));
+    if (budgetPct !== null && budgetPct < 80) positives.push(t('mr.posBudgetOk'));
+
+    const previousIncomeByPlatform = new Map(data.breakdown.incomeByPlatform.map((b) => [b.label, b.previous]));
+    const delivered = data.platforms.map((p) => ({
+      p: p.name,
+      incNow: p.income,
+      incPrev: previousIncomeByPlatform.get(p.name) ?? 0,
+      expNow: p.expense,
+      nInc: p.incomeCount,
+      nExp: p.expenseCount,
+      topInc: p.topIncome ? ([lang === 'ar' ? p.topIncome.categoryAr : p.topIncome.category, p.topIncome.amount] as [string, number]) : undefined,
+      topExp: p.topExpense ? ([lang === 'ar' ? p.topExpense.categoryAr : p.topExpense.category, p.topExpense.amount] as [string, number]) : undefined,
+    }));
+
+    const sourceRows: [string, number][] = [
+      [tr.kpiIncome, overview.totalIncome.current],
+      [tr.kpiExpenses, overview.totalExpenses.current],
+      [tr.kpiNetResult, overview.netResult.current],
+      [tr.kpiCashCollected, overview.cashCollected.current],
+      [tr.kpiPendingIncome, overview.pendingIncomeTotal],
+      [tr.upcomingObligations, overview.upcomingObligationsTotal],
+      [t('pos.paid'), data.position.paid],
+      [t('pos.outstanding'), data.position.outstanding],
+    ];
+    return { cur, fmt, rows, headline, resultsLine, autoProblems, positives, negatives, delivered, sourceRows };
+  };
+  const blocks = (['USD', 'LYD'] as const).map(build);
+
+  /* ---- carried over: anything not yet paid in the period (each row keeps its own currency) ---- */
+  const carried = txAll.filter((x) => x.status !== 'paid').sort((a, b) => a.date.localeCompare(b.date));
+  const anyProblems = blocks.some((b) => b.autoProblems.length > 0);
 
   const addProposal = () =>
     update({ proposals: [...draft.proposals, { id: String(Date.now()), proposal: '', why: '', impact: '', cost: '', priority: 'medium', decision: '' }] });
@@ -215,15 +219,13 @@ export default function MonthlyReport() {
       <Section title={t('mr.exec')}>
         <dl className="divide-y divide-line border-y border-line text-sm">
           {[
-            [t('mr.headline'), <span key="h" dir="auto" className="font-semibold">{headline}</span>],
-            [t('mr.results'), <span key="r" dir="auto">{resultsLine}</span>],
+            [t('mr.headline'), <div key="h" className="space-y-1">{blocks.map((b) => <p key={b.cur} dir="auto" className="font-semibold"><span dir="ltr" className="me-2 text-xs text-muted">{b.cur}</span>{b.headline}</p>)}</div>],
+            [t('mr.results'), <div key="r" className="space-y-1">{blocks.map((b) => <p key={b.cur} dir="auto"><span dir="ltr" className="me-2 text-xs text-muted">{b.cur}</span>{b.resultsLine}</p>)}</div>],
             [
               t('mr.problems'),
               <div key="p" className="space-y-1">
-                {autoProblems.length === 0 && !draft.problems && <p className="text-muted">{t('mr.noIssues')}</p>}
-                {autoProblems.map((p) => (
-                  <p key={p}>– {p}</p>
-                ))}
+                {!anyProblems && !draft.problems && <p className="text-muted">{t('mr.noIssues')}</p>}
+                {blocks.flatMap((b) => b.autoProblems.map((p) => <p key={`${b.cur}-${p}`}>– <span dir="ltr" className="text-xs text-muted">{b.cur}</span> {p}</p>))}
                 <textarea aria-label={t('mr.problems')} rows={2} value={draft.problems} onChange={(e) => update({ problems: e.target.value })} placeholder={t('mr.writeHere')} className={inputCls} />
               </div>,
             ],
@@ -245,49 +247,55 @@ export default function MonthlyReport() {
       </Section>
 
       <Section title={t('mr.numbers')} breakBefore>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b-2 border-ink text-xs text-muted">
-                <th scope="col" className="px-3 py-2 text-start font-semibold">{t('mr.metric')}</th>
-                <th scope="col" className="px-3 py-2 text-end font-semibold">{t('mr.last')}</th>
-                <th scope="col" className="px-3 py-2 text-end font-semibold">{t('mr.this')}</th>
-                <th scope="col" className="px-3 py-2 text-end font-semibold">{t('mr.chg')}</th>
-                <th scope="col" className="px-3 py-2 text-end font-semibold">{t('mr.target')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const hasPrev = Number.isFinite(r.metric.previous);
-                return (
-                  <tr key={r.key} className="border-b border-line transition-colors hover:bg-surface-2">
-                    <td className="px-3 py-3 font-bold text-ink">{(tr as Record<string, string>)[r.labelKey]}</td>
-                    <td dir="ltr" className="px-3 py-3 text-end tabular-nums">{hasPrev ? fmt(r.metric.previous) : na}</td>
-                    <td dir="ltr" className="px-3 py-3 text-end font-semibold tabular-nums">{fmt(r.metric.current)}</td>
-                    <td dir="ltr" className="px-3 py-3 text-end font-bold tabular-nums">{hasPrev ? pctText(pctChange(r.metric.current, r.metric.previous), na) : na}</td>
-                    <td className="px-3 py-3 text-end text-muted">{t('mr.targetNone')}</td>
+        {blocks.map((b) => (
+          <div key={b.cur} className="mb-6 last:mb-0">
+            <Pill>{b.cur}</Pill>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b-2 border-ink text-xs text-muted">
+                    <th scope="col" className="px-3 py-2 text-start font-semibold">{t('mr.metric')}</th>
+                    <th scope="col" className="px-3 py-2 text-end font-semibold">{t('mr.last')}</th>
+                    <th scope="col" className="px-3 py-2 text-end font-semibold">{t('mr.this')}</th>
+                    <th scope="col" className="px-3 py-2 text-end font-semibold">{t('mr.chg')}</th>
+                    <th scope="col" className="px-3 py-2 text-end font-semibold">{t('mr.target')}</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {b.rows.map((r) => {
+                    const hasPrev = Number.isFinite(r.metric.previous);
+                    return (
+                      <tr key={r.key} className="border-b border-line transition-colors hover:bg-surface-2">
+                        <td className="px-3 py-3 font-bold text-ink">{(tr as Record<string, string>)[r.labelKey]}</td>
+                        <td dir="ltr" className="px-3 py-3 text-end tabular-nums">{hasPrev ? b.fmt(r.metric.previous) : na}</td>
+                        <td dir="ltr" className="px-3 py-3 text-end font-semibold tabular-nums">{b.fmt(r.metric.current)}</td>
+                        <td dir="ltr" className="px-3 py-3 text-end font-bold tabular-nums">{hasPrev ? pctText(pctChange(r.metric.current, r.metric.previous), na) : na}</td>
+                        <td className="px-3 py-3 text-end text-muted">{t('mr.targetNone')}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
       </Section>
 
       <Section title={t('mr.delivered')}>
-        {tx.loading && !tx.rows ? <p className="text-sm text-muted">…</p> : null}
-        {delivered.map((d) => (
-          <div key={d.p}>
-            <Pill>{d.p}</Pill>
-            <p className="mb-1 text-xs italic text-muted">{t('mr.deliveredLine')}</p>
-            <ul className="space-y-1 ps-4 text-sm">
-              <li>– {tr.income}: <span dir="ltr" className="font-semibold tabular-nums">{fmt(d.incNow)}</span> {pctText(pctChange(d.incNow, d.incPrev), na)} · {d.nInc}</li>
-              <li>– {tr.expenses}: <span dir="ltr" className="font-semibold tabular-nums">{fmt(d.expNow)}</span> · {d.nExp}</li>
-              {d.topInc && <li>– {tr.income} / {d.topInc[0]}: <span dir="ltr" className="tabular-nums">{fmt(d.topInc[1])}</span></li>}
-              {d.topExp && <li>– {tr.expenses} / {d.topExp[0]}: <span dir="ltr" className="tabular-nums">{fmt(d.topExp[1])}</span></li>}
-            </ul>
-          </div>
-        ))}
+                {blocks.map((b) =>
+          b.delivered.map((d) => (
+            <div key={`${b.cur}-${d.p}`}>
+              <Pill>{d.p} · {b.cur}</Pill>
+              <p className="mb-1 text-xs italic text-muted">{t('mr.deliveredLine')}</p>
+              <ul className="space-y-1 ps-4 text-sm">
+                <li>– {tr.income}: <span dir="ltr" className="font-semibold tabular-nums">{b.fmt(d.incNow)}</span> {pctText(pctChange(d.incNow, d.incPrev), na)} · {d.nInc}</li>
+                <li>– {tr.expenses}: <span dir="ltr" className="font-semibold tabular-nums">{b.fmt(d.expNow)}</span> · {d.nExp}</li>
+                {d.topInc && <li>– {tr.income} / {d.topInc[0]}: <span dir="ltr" className="tabular-nums">{b.fmt(d.topInc[1])}</span></li>}
+                {d.topExp && <li>– {tr.expenses} / {d.topExp[0]}: <span dir="ltr" className="tabular-nums">{b.fmt(d.topExp[1])}</span></li>}
+              </ul>
+            </div>
+          ))
+        )}
       </Section>
 
       <Section title={t('mr.carried')} breakBefore>
@@ -309,7 +317,7 @@ export default function MonthlyReport() {
                     <td className="px-3 py-3 font-semibold text-ink">{lang === 'ar' ? x.descriptionAr : x.description}</td>
                     <td className="px-3 py-3 text-muted">{t('mr.ownerNone')}</td>
                     <td className="px-3 py-3">{x.date ? <span dir="ltr" className="tabular-nums">{x.date}</span> : <span className="bg-warn px-2 py-0.5 text-xs font-bold text-black">{t('mr.noDate')}</span>}</td>
-                    <td className="px-3 py-3 text-muted">{statusLabel(x.status)} · <span dir="ltr" className="tabular-nums">{fmt(x.amount)}</span></td>
+                    <td className="px-3 py-3 text-muted">{statusLabel(x.status)} · <span dir="ltr" className="tabular-nums">{formatCurrency(x.amount, x.currency)}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -322,11 +330,11 @@ export default function MonthlyReport() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div>
             <Pill>{t('mr.positives')}</Pill>
-            <ul className="space-y-1 text-sm">{positives.length ? positives.map((p) => <li key={p}>– {p}</li>) : <li className="text-muted">{na}</li>}</ul>
+            <ul className="space-y-1 text-sm">{blocks.some((b) => b.positives.length) ? blocks.flatMap((b) => b.positives.map((p) => <li key={`${b.cur}-${p}`}>– <span dir="ltr" className="text-xs text-muted">{b.cur}</span> {p}</li>)) : <li className="text-muted">{na}</li>}</ul>
           </div>
           <div>
             <Pill>{t('mr.negatives')}</Pill>
-            <ul className="space-y-1 text-sm">{negatives.length ? negatives.map((p) => <li key={p}>– {p}</li>) : <li className="text-muted">{na}</li>}</ul>
+            <ul className="space-y-1 text-sm">{blocks.some((b) => b.negatives.length) ? blocks.flatMap((b) => b.negatives.map((p) => <li key={`${b.cur}-${p}`}>– <span dir="ltr" className="text-xs text-muted">{b.cur}</span> {p}</li>)) : <li className="text-muted">{na}</li>}</ul>
           </div>
           <div>
             <Pill>{t('mr.strengths')}</Pill>
@@ -340,26 +348,31 @@ export default function MonthlyReport() {
       </Section>
 
       <Section title={t('mr.sources')}>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b-2 border-ink text-xs text-muted">
-                {[t('mr.number'), t('mr.value'), t('mr.origin')].map((h) => (
-                  <th key={h} scope="col" className="px-3 py-2 text-start font-semibold">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sourceRows.map(([label, v]) => (
-                <tr key={label} className="border-b border-line">
-                  <td className="px-3 py-2.5 font-semibold">{label}</td>
-                  <td dir="ltr" className="px-3 py-2.5 text-start tabular-nums">{fmt(v)}</td>
-                  <td className="px-3 py-2.5 text-muted">{t('mr.originLive')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {blocks.map((b) => (
+          <div key={b.cur} className="mb-6 last:mb-0">
+            <Pill>{b.cur}</Pill>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b-2 border-ink text-xs text-muted">
+                    {[t('mr.number'), t('mr.value'), t('mr.origin')].map((h) => (
+                      <th key={h} scope="col" className="px-3 py-2 text-start font-semibold">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {b.sourceRows.map(([label, v]) => (
+                    <tr key={label} className="border-b border-line">
+                      <td className="px-3 py-2.5 font-semibold">{label}</td>
+                      <td dir="ltr" className="px-3 py-2.5 text-start tabular-nums">{b.fmt(v)}</td>
+                      <td className="px-3 py-2.5 text-muted">{t('mr.originLive')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
       </Section>
 
       <Section title={t('mr.proposals')} breakBefore>

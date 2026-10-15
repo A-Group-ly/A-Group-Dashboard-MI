@@ -268,3 +268,73 @@ test('the dev auth harness is impossible outside development', () => {
   assert.equal(devBypassRole({ NODE_ENV: 'development', DEV_AUTH_BYPASS_ROLE: 'ROOT' }), null);
   assert.equal(devBypassRole({ NODE_ENV: 'development' }), null);
 });
+
+/* ---------------- billing dates, validation, new permissions ---------------- */
+
+import { initialRenewal, newInvoiceNumber, nextRenewalAfter, accountForCollection, platformForProduct, defaultDueDate } from '../src/lib/billingDates.ts';
+import { Reader } from '../src/lib/server/validate.ts';
+import { enumParam, parsePaging } from '../src/lib/server/paging.ts';
+
+test('renewal dates follow the billing interval and cap the day at 28', () => {
+  assert.equal(nextRenewalAfter('2026-10-14', 'MONTHLY'), '2026-11-14');
+  assert.equal(nextRenewalAfter('2026-01-31', 'MONTHLY'), '2026-02-28');
+  assert.equal(nextRenewalAfter('2026-10-14', 'QUARTERLY'), '2027-01-14');
+  assert.equal(nextRenewalAfter('2026-10-14', 'YEARLY'), '2027-10-14');
+  assert.equal(nextRenewalAfter('2026-10-14', 'WEEKLY'), '2026-10-21');
+  assert.equal(initialRenewal('2026-10-14', 'MONTHLY', 14), '2026-10-28'); // trial first
+  assert.equal(defaultDueDate('2026-10-20'), '2026-11-03');
+});
+
+test('invoice numbers are well-formed and differ between calls', () => {
+  assert.match(newInvoiceNumber('2026-10-14'), /^INV-20261014-[0-9A-Z]{6}$/);
+  const seen = new Set(Array.from({ length: 200 }, () => newInvoiceNumber('2026-10-14')));
+  assert.ok(seen.size > 195);
+});
+
+test('collections go to the right account and platform', () => {
+  assert.equal(accountForCollection('LYD', 'CASH'), 'acc-lyd-cash-main');
+  assert.equal(accountForCollection('LYD', 'BANK_TRANSFER'), 'acc-lyd-bank-main');
+  assert.equal(accountForCollection('USD', 'INTERNATIONAL_CARD'), 'acc-usd-card-processor');
+  assert.equal(accountForCollection('USD', 'BANK_TRANSFER'), 'acc-usd-bank-main');
+  assert.equal(platformForProduct('prd_005'), 'plat-a-market');
+  assert.equal(platformForProduct('unknown'), 'plat-corporate');
+});
+
+test('Reader validates strings, emails, enums, dates and money exactly', () => {
+  const r = new Reader({ name: '  Omar  ', email: 'Omar@Example.com', bad: 'x\u0000y', type: 'ENTERPRISE', d: '2026-02-30', m: '10.555', ok: '10.5', n: 5 });
+  assert.equal(r.str('name', { min: 2, max: 10, required: true }), 'Omar');
+  assert.equal(r.email('email'), 'omar@example.com');
+  assert.equal(r.str('bad', { max: 10 }), undefined);
+  assert.equal(r.oneOf('type', ['ENTERPRISE', 'INDIVIDUAL']), 'ENTERPRISE');
+  assert.equal(r.oneOf('type', ['INDIVIDUAL']), undefined);
+  assert.equal(r.date('d'), undefined);
+  assert.equal(r.money('m'), undefined);
+  assert.equal(r.money('ok'), 10.5);
+  assert.equal(r.int('n', { min: 1, max: 9 }), 5);
+  assert.deepEqual(Object.keys(r.errors).sort(), ['bad', 'd', 'm', 'type']);
+  assert.equal(new Reader(null).str('x', { max: 5, required: true }), undefined);
+});
+
+test('paging input is clamped and whitelisted', () => {
+  const p = parsePaging(new URLSearchParams('page=-4&pageSize=9999&sort=evil&dir=sideways&q=%20hello%20'), ['name', 'city'], 'name');
+  assert.deepEqual(p, { page: 1, pageSize: 100, sort: 'name', dir: 'asc', q: 'hello' });
+  assert.equal(parsePaging(new URLSearchParams('sort=city&dir=desc'), ['name', 'city'], 'name').sort, 'city');
+  assert.equal(enumParam('past_due', ['PAST_DUE', 'ACTIVE']), 'PAST_DUE');
+  assert.equal(enumParam('bogus', ['PAST_DUE']), null);
+});
+
+test('write permissions: analysts and read-only never write; finance writes data; only admins manage catalog, users and audit', () => {
+  const writes = ['customers:write', 'subscriptions:write', 'invoices:write', 'payments:record', 'transactions:write', 'budgets:write'];
+  for (const w of writes) {
+    assert.equal(can('READ_ONLY', w), false, `READ_ONLY ${w}`);
+    assert.equal(can('ANALYST', w), false, `ANALYST ${w}`);
+    assert.equal(can('FINANCE', w), true, `FINANCE ${w}`);
+    assert.equal(can('ADMIN', w), true, `ADMIN ${w}`);
+  }
+  for (const a of ['plans:write', 'audit:view', 'users:manage']) {
+    assert.equal(can('FINANCE', a), false, `FINANCE ${a}`);
+    assert.equal(can('ADMIN', a), true, `ADMIN ${a}`);
+  }
+  assert.equal(permissionForPath('/invoices'), 'invoices:view');
+  assert.equal(permissionForPath('/audit'), 'audit:view');
+});

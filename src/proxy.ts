@@ -11,7 +11,7 @@ import { devBypassRole } from './lib/devBypass';
  * Role checks and tenant scoping happen again inside every route handler (defence in depth: this file is
  * Node-runtime middleware, which OpenNext on Cloudflare treats as experimental).
  */
-const PUBLIC = [/^\/sign-in(\/.*)?$/, /^\/api\/health$/, /^\/api\/webhooks(\/.*)?$/];
+const PUBLIC = [/^\/sign-in(\/.*)?$/, /^\/sign-up(\/.*)?$/, /^\/api\/health$/, /^\/api\/webhooks(\/.*)?$/];
 
 const clerk = clerkMiddleware(async (auth, req) => {
   const path = req.nextUrl.pathname;

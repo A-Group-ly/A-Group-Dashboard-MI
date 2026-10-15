@@ -9,6 +9,8 @@ import { ROUTE_PERMISSION, type Permission } from '@/lib/permissions';
 import Logo from '@/components/Logo';
 import RefreshStatus from './RefreshStatus';
 import AccountMenu from './AccountMenu';
+import CommandPalette from './CommandPalette';
+import NotificationBell from './NotificationBell';
 
 const NAV: { group?: string; items: { href: string; key: string }[] }[] = [
   { items: [{ href: '/', key: 'nav.overview' }] },
@@ -18,6 +20,7 @@ const NAV: { group?: string; items: { href: string; key: string }[] }[] = [
       { href: '/organizations', key: 'nav.organizations' },
       { href: '/customers', key: 'nav.customers' },
       { href: '/subscriptions', key: 'nav.subscriptions' },
+      { href: '/invoices', key: 'nav.invoices' },
     ],
   },
   {
@@ -32,6 +35,8 @@ const NAV: { group?: string; items: { href: string; key: string }[] }[] = [
     group: 'nav.groupSystem',
     items: [
       { href: '/alerts', key: 'nav.alerts' },
+      { href: '/audit', key: 'nav.audit' },
+      { href: '/tv', key: 'nav.tv' },
       { href: '/settings', key: 'nav.settings' },
     ],
   },
@@ -43,10 +48,11 @@ const segOff = 'text-header-ink/70 hover:bg-white/10 hover:text-header-ink';
 const hdrBtn = 'border border-header-line px-2.5 py-1 text-sm transition-colors duration-150 hover:bg-white/10 active:scale-95';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { t, lang, setLang, theme, toggleTheme, currency, setCurrency } = useApp();
+  const { t, lang, setLang, theme, toggleTheme } = useApp();
   const { can } = useAccess();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [searchSignal, setSearchSignal] = useState(0);
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`));
   // Convenience only: the server enforces the same rules on every API call.
@@ -70,7 +76,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <Logo className="h-9 w-9 shrink-0 text-ink" />
           <div className="min-w-0">
             <div dir="ltr" className="text-start font-head text-sm font-bold tracking-wide">{t('app.name')}</div>
-            <div className="truncate text-[10px] uppercase tracking-[0.14em] text-muted">{t('app.sub')}</div>
+            <div className="text-[10px] uppercase leading-tight tracking-[0.14em] text-muted">{t('app.sub')}</div>
           </div>
           <button type="button" className="ms-auto text-muted transition-colors hover:text-ink lg:hidden" onClick={() => setOpen(false)} aria-label={t('shell.closeMenu')}>
             ✕
@@ -124,13 +130,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="ms-auto flex flex-wrap items-center gap-x-3 gap-y-2">
               <RefreshStatus />
 
-              <div role="group" aria-label={t('shell.currency')} className="flex border border-header-line">
-                {(['LYD', 'USD'] as const).map((c) => (
-                  <button key={c} type="button" aria-pressed={currency === c} onClick={() => setCurrency(c)} className={`${segBase} ${currency === c ? segOn : segOff}`}>
-                    {c}
-                  </button>
-                ))}
-              </div>
+              <button type="button" onClick={() => setSearchSignal((n) => n + 1)} aria-label={t('cmd.title')} title={`${t('cmd.title')} (Ctrl+K)`} className={hdrBtn}>
+                <span aria-hidden="true">⌕</span>
+              </button>
+
+              <NotificationBell />
 
               <div role="group" aria-label={t('shell.language')} className="flex border border-header-line">
                 <button type="button" aria-pressed={lang === 'en'} onClick={() => setLang('en')} className={`${segBase} ${lang === 'en' ? segOn : segOff}`}>EN</button>
@@ -145,6 +149,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
+
+        <CommandPalette openSignal={searchSignal} />
 
         <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1280px] px-4 py-6 lg:px-8">
           {children}

@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useClerk } from '@clerk/nextjs';
 import { useApp } from '@/components/providers/AppProvider';
 import { useAccess } from '@/components/providers/AccessProvider';
+import { useAnchoredPopover } from '@/components/ui/useAnchoredPopover';
 
 function initials(name: string | null, email: string | null): string {
   const src = (name || email || '?').trim();
@@ -21,6 +22,8 @@ export default function AccountMenu() {
   const { signOut, openUserProfile } = useClerk();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const pop = useAnchoredPopover(open, trigger, 288);
 
   useEffect(() => {
     if (!open) return;
@@ -43,6 +46,7 @@ export default function AccountMenu() {
   return (
     <div ref={ref} className="relative">
       <button
+        ref={trigger}
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
@@ -59,10 +63,10 @@ export default function AccountMenu() {
       </button>
 
       {open && (
-        <div role="menu" className="absolute end-0 top-full z-50 mt-2 w-64 border border-line bg-surface text-ink shadow-lg">
+        <div role="menu" style={pop} className="z-50 border border-line bg-surface text-ink shadow-lg">
           <div className="border-b border-line px-4 py-3">
-            <div className="truncate text-sm font-semibold" dir="auto">{me.name || me.email}</div>
-            {me.name && me.email && <div dir="ltr" className="truncate text-xs text-muted">{me.email}</div>}
+            <div className="break-words text-sm font-semibold" dir="auto">{me.name || me.email}</div>
+            {me.name && me.email && <div dir="ltr" className="break-all text-xs text-muted">{me.email}</div>}
             {/* Informational only: not interactive */}
             <div className="mt-2 flex items-center justify-between text-xs">
               <span className="text-muted">{t('acct.role')}</span>

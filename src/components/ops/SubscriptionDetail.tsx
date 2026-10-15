@@ -1,9 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/components/providers/AppProvider';
 import { useApiData } from '@/components/providers/useApiData';
+import { useAccess } from '@/components/providers/AccessProvider';
+import { Button } from '@/components/ui/forms';
+import { NewInvoiceDialog, SubscriptionActionDialog, type SubAction } from './BillingDialogs';
 import { ApiGate, Card, DemoNotice, EmptyState, Money, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import { InvoiceTable, PaymentTable, type InvoiceRow, type PaymentRowUi } from './BillingTables';
 import type { SubRow } from '@/app/(app)/subscriptions/page';
@@ -17,6 +20,9 @@ interface Detail {
 export default function SubscriptionDetail({ id }: { id: string }) {
   const { t } = useApp();
   const state = useApiData<Detail>(`/api/subscriptions/${encodeURIComponent(id)}`);
+  const { can } = useAccess();
+  const [action, setAction] = useState<SubAction | null>(null);
+  const [invoicing, setInvoicing] = useState(false);
 
   return (
     <ApiGate state={state}>
@@ -45,6 +51,23 @@ export default function SubscriptionDetail({ id }: { id: string }) {
               title={`${t('sub.detail')} · ${s.id}`}
               subtitle={`${s.customerName} — ${s.productName} / ${s.planName}`}
               crumbs={[{ href: '/subscriptions', label: t('sub.title') }, { label: s.id }]}
+              actions={
+                can('subscriptions:write') || can('invoices:write') ? (
+                  <>
+                    {can('subscriptions:write') && ['active', 'trial', 'past_due'].includes(s.status) && <Button variant="secondary" onClick={() => setAction('pause')}>{t('sub.pause')}</Button>}
+                    {can('subscriptions:write') && s.status === 'paused' && <Button onClick={() => setAction('resume')}>{t('sub.resume')}</Button>}
+                    {can('invoices:write') && !['canceled', 'expired'].includes(s.status) && <Button variant="secondary" onClick={() => setInvoicing(true)}>+ {t('sub.newInvoice')}</Button>}
+                    {can('subscriptions:write') && ['active', 'trial', 'past_due', 'paused'].includes(s.status) && <Button variant="danger" onClick={() => setAction('cancel')}>{t('sub.cancel')}</Button>}
+                  </>
+                ) : undefined
+              }
+            />
+            <SubscriptionActionDialog open={action !== null} action={action ?? 'pause'} subscriptionId={s.id} name={s.customerName} onClose={() => setAction(null)} onDone={state.retry} />
+            <NewInvoiceDialog
+              open={invoicing}
+              subscription={{ id: s.id, label: `${s.customerName} — ${s.productName} / ${s.planName}`, price: s.price, currency: s.currency }}
+              onClose={() => setInvoicing(false)}
+              onDone={state.retry}
             />
             <DemoNotice />
 

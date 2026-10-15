@@ -76,7 +76,7 @@ export default function DonutChart({ title, slices, format, emptyText, totalLabe
               >
                 <span className="flex min-w-0 items-center gap-2 text-ink-2">
                   <span className="h-2.5 w-2.5 shrink-0" style={{ background: SLICE_COLORS[i % SLICE_COLORS.length] }} aria-hidden="true" />
-                  <span className="truncate" dir="auto">{s.label}</span>
+                  <span className="break-words" dir="auto" title={s.label}>{s.label}</span>
                 </span>
                 <span className="shrink-0 tabular-nums text-ink">
                   <b dir="ltr">{((s.value / total) * 100).toFixed(1)}%</b>

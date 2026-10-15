@@ -134,7 +134,8 @@ export default function LineChart({ labels, series, format, ariaLabel, height = 
       )}
 
       {/* Text alternative for assistive technology */}
-      <table className="sr-only">
+      <div className="sr-only">
+      <table>
         <caption>{ariaLabel}</caption>
         <thead>
           <tr>
@@ -155,6 +156,7 @@ export default function LineChart({ labels, series, format, ariaLabel, height = 
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

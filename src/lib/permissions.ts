@@ -13,6 +13,15 @@ export type Permission =
   | 'export:csv'
   | 'customers:view'
   | 'subscriptions:view'
+  | 'invoices:view'
+  | 'customers:write'
+  | 'subscriptions:write'
+  | 'invoices:write'
+  | 'payments:record'
+  | 'transactions:write'
+  | 'budgets:write'
+  | 'plans:write'
+  | 'audit:view'
   | 'alerts:view'
   | 'organizations:view'
   | 'users:manage'
@@ -20,8 +29,20 @@ export type Permission =
 
 const READ_ONLY: Permission[] = ['dashboard:view', 'settings:view'];
 const ANALYST: Permission[] = [...READ_ONLY, 'transactions:view', 'budgets:view', 'reports:view', 'export:csv'];
-const FINANCE: Permission[] = [...ANALYST, 'customers:view', 'subscriptions:view', 'alerts:view'];
-const ADMIN: Permission[] = [...FINANCE, 'organizations:view', 'users:manage'];
+const FINANCE: Permission[] = [
+  ...ANALYST,
+  'customers:view',
+  'subscriptions:view',
+  'invoices:view',
+  'alerts:view',
+  'customers:write',
+  'subscriptions:write',
+  'invoices:write',
+  'payments:record',
+  'transactions:write',
+  'budgets:write',
+];
+const ADMIN: Permission[] = [...FINANCE, 'organizations:view', 'users:manage', 'plans:write', 'audit:view'];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   READ_ONLY,
@@ -45,6 +66,9 @@ export const ROUTE_PERMISSION: Record<string, Permission> = {
   '/reports': 'reports:view',
   '/customers': 'customers:view',
   '/subscriptions': 'subscriptions:view',
+  '/invoices': 'invoices:view',
+  '/audit': 'audit:view',
+  '/tv': 'dashboard:view',
   '/alerts': 'alerts:view',
   '/organizations': 'organizations:view',
   '/settings': 'settings:view',

@@ -1,4 +1,5 @@
 import { AccessProvider } from "@/components/providers/AccessProvider";
+import { ToastProvider } from "@/components/providers/ToastProvider";
 import { DashboardDataProvider } from "@/components/providers/DashboardDataProvider";
 import AppShell from "@/components/shell/AppShell";
 import RouteGate from "@/components/shell/RouteGate";
@@ -8,9 +9,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AccessProvider>
       <DashboardDataProvider>
-        <AppShell>
-          <RouteGate>{children}</RouteGate>
-        </AppShell>
+        <ToastProvider>
+          <AppShell>
+            <RouteGate>{children}</RouteGate>
+          </AppShell>
+        </ToastProvider>
       </DashboardDataProvider>
     </AccessProvider>
   );

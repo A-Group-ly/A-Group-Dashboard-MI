@@ -94,7 +94,8 @@ export default function BarChart({ labels, series, format, ariaLabel, height = 2
         </div>
       )}
 
-      <table className="sr-only">
+      <div className="sr-only">
+      <table>
         <caption>{ariaLabel}</caption>
         <thead>
           <tr><th scope="col">Period</th>{series.map((s) => <th key={s.key} scope="col">{s.name}</th>)}</tr>
@@ -105,6 +106,7 @@ export default function BarChart({ labels, series, format, ariaLabel, height = 2
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

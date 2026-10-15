@@ -35,8 +35,8 @@ const SEV_TONE: Record<Severity, BadgeTone> = { high: 'bad', medium: 'warn', low
 const sevKey = (s: Severity) => `alert.sev${s[0].toUpperCase()}${s.slice(1)}`;
 
 export default function AlertsPage() {
-  const { t, range, previous, currency } = useApp();
-  const qs = new URLSearchParams({ from: range.from, to: range.to, prevFrom: previous.from, prevTo: previous.to, currency });
+  const { t, range, previous } = useApp();
+  const qs = new URLSearchParams({ from: range.from, to: range.to, prevFrom: previous.from, prevTo: previous.to });
   const state = useApiData<{ alerts: AlertItem[]; activity: ActivityItem[] }>(`/api/alerts?${qs}`);
 
   const columns: Column<AlertItem>[] = [
