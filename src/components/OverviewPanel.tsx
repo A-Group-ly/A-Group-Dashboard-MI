@@ -15,9 +15,12 @@ import FinancialPosition from '@/components/FinancialPosition';
  * Everything for ONE currency (the enclosing <CurrencyScope>). The overview renders two of these side by
  * side: USD on the left, LYD on the right. Amounts are never combined across currencies.
  */
-export default function OverviewPanel() {
+export type OverviewTab = 'summary' | 'charts' | 'breakdown';
+
+export default function OverviewPanel({ tab = 'summary' }: { tab?: OverviewTab }) {
   const { currency, lang, dir, hidden, tr: t, t: ui } = useApp();
   const show = (k: string) => !hidden.includes(k as never);
+  const inTab = (t: OverviewTab) => tab === t;
   const { data } = useDashboardData();
   if (!data) return <PageSkeleton />;
   const o = data.overview;
@@ -31,10 +34,10 @@ export default function OverviewPanel() {
         <span className="text-xs font-semibold text-muted">{name}</span>
       </header>
 
-      {show('position') && <FinancialPosition position={data.position} spending={data.spending} />}
+      {inTab('summary') && show('position') && <FinancialPosition position={data.position} spending={data.spending} />}
 
-      {show('kpis') && <h3 className="mb-3 font-head text-sm font-bold text-ink">{ui('kpi.title')}</h3>}
-      {show('kpis') && <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
+      {inTab('summary') && show('kpis') && <h3 className="mb-3 font-head text-sm font-bold text-ink">{ui('kpi.title')}</h3>}
+      {inTab('summary') && show('kpis') && <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
         <KpiCard title={t.kpiIncome} metric={o.totalIncome} subtitle={t.vsLastMonth} language={lang} sentimentType="income" />
         <KpiCard title={t.kpiExpenses} metric={o.totalExpenses} subtitle={t.vsLastMonth} language={lang} sentimentType="expense" />
         <KpiCard title={t.kpiNetResult} metric={o.netResult} subtitle={t.vsLastMonth} language={lang} sentimentType="net" />
@@ -51,15 +54,15 @@ export default function OverviewPanel() {
         />
       </div>}
 
-      {show('charts') && (
-        <div className="mt-6">
+      {inTab('charts') && show('charts') && (
+        <div>
           <ChartsSection data={data} />
         </div>
       )}
 
-      <div className="mt-6 space-y-6">
-        {show('channels') && <PaymentChannelBreakdown incomeBreakdown={o.incomeByPaymentMethod} expensesBreakdown={o.expensesByPaymentMethod} currency={currency} language={lang} />}
-        {show('budget') && <BudgetBurndown
+      <div className="space-y-6">
+        {inTab('breakdown') && show('channels') && <PaymentChannelBreakdown incomeBreakdown={o.incomeByPaymentMethod} expensesBreakdown={o.expensesByPaymentMethod} currency={currency} language={lang} />}
+        {inTab('breakdown') && show('budget') && <BudgetBurndown
           currentExpenses={o.totalExpenses.current}
           remainingBudget={o.remainingBudget.current}
           upcomingTotal={o.upcomingObligationsTotal}
@@ -68,7 +71,7 @@ export default function OverviewPanel() {
           language={lang}
           budgetCap={data.meta.budgetCap}
         />}
-        {show('comparisons') && <ComparisonBars
+        {inTab('breakdown') && show('comparisons') && <ComparisonBars
           title={ui('cmp.incByPlatform')}
           items={data.breakdown.incomeByPlatform.map((b) => ({ key: b.key, label: lang === 'ar' ? b.labelAr : b.label, current: b.current, previous: b.previous }))}
           currency={currency}
@@ -76,7 +79,7 @@ export default function OverviewPanel() {
           currentLabel={ui('cmp.current')}
           previousLabel={ui('cmp.previous')}
         />}
-        {show('comparisons') && <ComparisonBars
+        {inTab('breakdown') && show('comparisons') && <ComparisonBars
           title={ui('cmp.expByCategory')}
           items={data.breakdown.expensesByCategory.map((b) => ({ key: b.key, label: lang === 'ar' ? b.labelAr : b.label, current: b.current, previous: b.previous }))}
           currency={currency}

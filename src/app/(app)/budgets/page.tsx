@@ -7,6 +7,7 @@ import { ApiGate, Card, DemoNotice, ErrorState, Money, PageHeader, PageSkeleton 
 import { useAccess } from '@/components/providers/AccessProvider';
 import { useApiData } from '@/components/providers/useApiData';
 import { Button } from '@/components/ui/forms';
+import Tabs, { useRememberedTab } from '@/components/ui/Tabs';
 import { BudgetDialog } from '@/components/ops/BillingDialogs';
 import KpiCard from '@/components/KpiCard';
 import BudgetBurndown from '@/components/BudgetBurndown';
@@ -25,7 +26,7 @@ function runningTotal(values: (number | null)[]): (number | null)[] {
   });
 }
 
-function BudgetsPanel() {
+function BudgetsPanel({ tab }: { tab: 'cash' | 'trend' }) {
   const { t, tr, lang, dir, currency } = useApp();
   const { data } = useDashboardData();
   if (!data) return <PageSkeleton />;
@@ -43,7 +44,7 @@ function BudgetsPanel() {
         <span className="text-xs font-semibold text-muted">{t(currency === 'USD' ? 'cur.usd' : 'cur.lyd')}</span>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
+      {tab === 'cash' && <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
         <KpiCard title={tr.kpiAvailableCash} metric={o.availableCash} subtitle={tr.illustrativeEstimate} language={lang} sentimentType="neutral" />
         <KpiCard
           title={tr.kpiRemainingBudget}
@@ -53,10 +54,10 @@ function BudgetsPanel() {
           sentimentType={o.budgetOverrun > 0 ? 'expense' : 'neutral'}
         />
         <KpiCard title={tr.kpiNetResult} metric={o.netResult} subtitle={tr.vsLastMonth} language={lang} sentimentType="net" />
-      </div>
+      </div>}
 
-      <div className="mt-6 space-y-6">
-        <Card title={t('bud.cumulative')} hint={t('bud.cumulativeHint')}>
+      <div className={tab === 'cash' ? 'mt-6 space-y-6' : 'space-y-6'}>
+        {tab === 'trend' && <Card title={t('bud.cumulative')} hint={t('bud.cumulativeHint')}>
           <LineChart
             labels={data.series.points.map((p) => shortDate(p.start, lang, data.series.bucket))}
             series={[
@@ -67,8 +68,8 @@ function BudgetsPanel() {
             ariaLabel={`${t('bud.cumulative')} — ${currency}`}
             height={240}
           />
-        </Card>
-        <BudgetBurndown
+        </Card>}
+        {tab === 'cash' && <BudgetBurndown
           currentExpenses={o.totalExpenses.current}
           remainingBudget={o.remainingBudget.current}
           upcomingTotal={o.upcomingObligationsTotal}
@@ -76,10 +77,10 @@ function BudgetsPanel() {
           currency={currency}
           language={lang}
           budgetCap={data.meta.budgetCap}
-        />
-        <Card title={tr.upcomingObligations} hint={tr.dueSoon}>
+        />}
+        {tab === 'cash' && <Card title={tr.upcomingObligations} hint={tr.dueSoon}>
           <p dir="ltr" className="text-2xl font-bold tabular-nums text-ink">{fmt(o.upcomingObligationsTotal)}</p>
-        </Card>
+        </Card>}
       </div>
     </section>
   );
@@ -118,6 +119,7 @@ export default function BudgetsPage() {
   const { all, loading, error, refresh } = useDashboardData();
   const [dialog, setDialog] = useState<null | { month: string; currency: string; amount: number } | 'new'>(null);
   const [reload, setReload] = useState(0);
+  const [tab, setTab] = useRememberedTab<'cash' | 'trend' | 'list'>('ag_tab_budgets', ['cash', 'trend', 'list'], 'cash');
 
   if (loading) return <PageSkeleton />;
   if (!all) return <ErrorState message={error ?? t('err.server')} onRetry={refresh} />;
@@ -128,11 +130,24 @@ export default function BudgetsPage() {
       <ScopeBar />
       <DemoNotice text={tr.demoDataNotice} />
       <p className="mb-4 text-xs text-muted">{t('bud.cashNote')}</p>
-      <div dir="ltr" className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <CurrencyScope currency="USD"><BudgetsPanel /></CurrencyScope>
-        <CurrencyScope currency="LYD"><BudgetsPanel /></CurrencyScope>
-      </div>
-      <BudgetList reload={reload} onEdit={(b) => setDialog(b)} />
+      <Tabs
+        label={t('bud.title')}
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { key: 'cash', label: t('bdtab.cash') },
+          { key: 'trend', label: t('bdtab.trend') },
+          { key: 'list', label: t('bdtab.list') },
+        ]}
+      />
+      {tab === 'list' ? (
+        <BudgetList reload={reload} onEdit={(b) => setDialog(b)} />
+      ) : (
+        <div dir="ltr" className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <CurrencyScope currency="USD"><BudgetsPanel tab={tab} /></CurrencyScope>
+          <CurrencyScope currency="LYD"><BudgetsPanel tab={tab} /></CurrencyScope>
+        </div>
+      )}
       <BudgetDialog
         open={dialog !== null}
         preset={dialog && dialog !== 'new' ? dialog : null}

@@ -245,12 +245,12 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
         </div>
       )}
 
-      <div className={`overflow-x-auto transition-opacity duration-150 ${loading && resp ? 'opacity-60' : ''}`} aria-busy={loading}>
+      <div className={`max-h-[calc(100dvh-21rem)] min-h-[14rem] overflow-auto transition-opacity duration-150 ${loading && resp ? 'opacity-60' : ''}`} aria-busy={loading}>
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b-2 border-ink">
+            <tr>
               {bulkActions && (
-                <th scope="col" className="w-10 px-4 py-2.5">
+                <th scope="col" className="sticky top-0 z-10 w-10 bg-surface px-4 py-2.5 shadow-[inset_0_-2px_0_var(--ink)]">
                   <input
                     type="checkbox"
                     aria-label={t('bulk.selectPage')}
@@ -270,7 +270,7 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
                     key={c.key}
                     scope="col"
                     aria-sort={isSorted ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
-                    className={`whitespace-nowrap px-4 py-2.5 text-xs font-semibold text-muted ${c.align === 'end' ? 'text-end' : 'text-start'}`}
+                    className={`sticky top-0 z-10 whitespace-nowrap bg-surface px-4 py-2.5 text-xs font-semibold text-muted shadow-[inset_0_-2px_0_var(--ink)] ${c.align === 'end' ? 'text-end' : 'text-start'}`}
                   >
                     {c.sortKey ? (
                       <button type="button" onClick={() => toggleSort(c.sortKey!)} className="inline-flex items-center gap-1 hover:text-ink">

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '@/components/providers/AppProvider';
 import { pctChange, type ComparisonItem } from '@/lib/analytics';
 import { formatCurrency } from '@/lib/calculations';
@@ -26,7 +26,10 @@ interface Props {
  */
 export default function ComparisonBars({ title, items, currency, increaseIs, currentLabel, previousLabel, highlightKey }: Props) {
   const { t } = useApp();
+  const LIMIT = 6; // long lists show the top rows first; the rest is one click away
+  const [all, setAll] = useState(false);
   const max = Math.max(1, ...items.flatMap((i) => [i.current, i.previous]));
+  const visible = all ? items : items.slice(0, LIMIT);
 
   return (
     <section className="border border-line bg-surface p-5">
@@ -48,7 +51,7 @@ export default function ComparisonBars({ title, items, currency, increaseIs, cur
         <p className="py-6 text-center text-xs text-muted">{t('f.empty')}</p>
       ) : (
         <ul className="space-y-4">
-          {items.map((it) => {
+          {visible.map((it) => {
             const change = pctChange(it.current, it.previous);
             const up = it.current >= it.previous;
             const good = change === null || change === 0 ? null : increaseIs === 'good' ? up : !up;
@@ -85,6 +88,11 @@ export default function ComparisonBars({ title, items, currency, increaseIs, cur
             );
           })}
         </ul>
+      )}
+      {items.length > LIMIT && (
+        <button type="button" onClick={() => setAll((v) => !v)} className="mt-4 text-xs font-semibold text-accent-strong hover:underline">
+          {all ? t('act.showLess') : `${t('act.showAll')} (${items.length})`}
+        </button>
       )}
     </section>
   );
