@@ -72,6 +72,7 @@ export default function SubscriptionsPage() {
           pageSize={25}
           searchPlaceholder={t('sub.searchPh')}
           reloadKey={reload}
+          rowHref={(s) => `/subscriptions/${s.id}`}
           emptyAction={can('subscriptions:write') ? <Button onClick={() => setCreating(true)}>+ {t('sub.add')}</Button> : undefined}
           exportFilename="a-group-subscriptions.csv"
           toolbarEnd={

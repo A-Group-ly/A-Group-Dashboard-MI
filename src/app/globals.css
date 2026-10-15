@@ -239,5 +239,22 @@ input, textarea, [contenteditable="true"], .selectable, [data-selectable] { -web
 a[href], button:not(:disabled), [role="button"], [role="tab"], [role="option"], [role="menuitem"], summary, select, label[for],
 input[type="checkbox"], input[type="radio"], input[type="date"], input[type="month"], .cl-rootBox button { cursor: pointer; }
 button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
-[data-copy] { cursor: copy; }
+[data-copy] { cursor: pointer; text-decoration: underline dotted transparent; text-underline-offset: 3px; }
+[data-copy]:hover { text-decoration-color: currentColor; }
+[data-copy]:active { transform: scale(0.98); }
 @media print { main, table { -webkit-user-select: text; user-select: text; } }
+
+
+/* Signs of life: everything interactive reacts on hover and press. */
+html { scroll-behavior: smooth; }
+a, button, select, input, textarea, summary, [role="button"], [role="tab"], [role="option"], [role="menuitem"] {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
+}
+input:not([type="checkbox"]):not([type="radio"]):hover, select:hover, textarea:hover { border-color: var(--muted); }
+button:not(:disabled):not([role="tab"]):active, a[role="button"]:active, summary:active { transform: scale(0.97); }
+a[href]:not([role="menuitem"]):hover { text-decoration-line: none; }
+/* table rows that open a record */
+tr[data-rowlink] { cursor: pointer; }
+tr[data-rowlink]:hover td { background-color: var(--accent-soft); }
+tr[data-rowlink]:active td { background-color: var(--surface-2); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

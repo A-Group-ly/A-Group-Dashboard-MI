@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useApp } from '@/components/providers/AppProvider';
@@ -11,6 +11,7 @@ import RefreshStatus from './RefreshStatus';
 import AccountMenu from './AccountMenu';
 import CommandPalette from './CommandPalette';
 import NotificationBell from './NotificationBell';
+import BackToTop from './BackToTop';
 
 const NAV: { group?: string; items: { href: string; key: string }[] }[] = [
   { items: [{ href: '/', key: 'nav.overview' }] },
@@ -53,6 +54,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [searchSignal, setSearchSignal] = useState(0);
+
+  // Browser tab title follows the page (helps when several tabs are open).
+  useEffect(() => {
+    const hit = NAV.flatMap((g) => g.items).find((it) => (it.href === '/' ? pathname === '/' : pathname === it.href || pathname.startsWith(`${it.href}/`)));
+    const title = `${hit ? t(hit.key) : pathname === '/account' ? t('acct.title') : 'A-Group'} · A-Group`;
+    document.title = title;
+    // Next re-applies the static metadata title after a client navigation; set ours again right after it.
+    const id = window.setTimeout(() => {
+      document.title = title;
+    }, 150);
+    return () => window.clearTimeout(id);
+  }, [pathname, t]);
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`));
   // Convenience only: the server enforces the same rules on every API call.
@@ -151,6 +164,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <CommandPalette openSignal={searchSignal} />
+        <BackToTop />
 
         <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1280px] px-4 py-6 lg:px-8">
           {children}

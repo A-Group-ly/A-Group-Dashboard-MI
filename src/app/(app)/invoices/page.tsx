@@ -89,6 +89,7 @@ export default function InvoicesPage() {
           pageSize={25}
           searchPlaceholder={t('inv.searchPh')}
           reloadKey={reload}
+          rowHref={(i) => `/customers/${i.customerId}`}
           emptyAction={can('invoices:write') ? <Button onClick={() => setCreating(true)}>+ {t('inv.add')}</Button> : undefined}
           exportFilename="a-group-invoices.csv"
           toolbarEnd={canWrite ? <Button onClick={() => setCreating(true)}>+ {t('inv.add')}</Button> : null}

@@ -5,6 +5,7 @@ import { useApp } from '@/components/providers/AppProvider';
 import { useAccess } from '@/components/providers/AccessProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import { fetchRetry } from '@/lib/fetchRetry';
+import { useRouter } from 'next/navigation';
 import { useDashboardData } from '@/components/providers/DashboardDataProvider';
 import { controlClass, EmptyState, ErrorState } from './primitives';
 
@@ -50,6 +51,8 @@ interface Props<T, R extends Page<T>> {
   toolbarEnd?: React.ReactNode;
   /** Shown in the empty state when nothing exists yet (for example "Add your first customer"). */
   emptyAction?: React.ReactNode;
+  /** Where a click on a row goes (links, buttons and copy targets inside the row keep their own behaviour). */
+  rowHref?: (row: T) => string | null;
 }
 
 /**
@@ -70,7 +73,9 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
   exportFilename,
   toolbarEnd,
   emptyAction,
+  rowHref,
 }: Props<T, R>) {
+  const router = useRouter();
   const { t } = useApp();
   const { version } = useDashboardData();
   const { can } = useAccess();
@@ -269,7 +274,16 @@ export default function ServerTable<T, R extends Page<T> = Page<T>>({
               </tr>
             ) : (
               resp.data.map((row) => (
-                <tr key={rowKey(row)} className="border-b border-line transition-colors duration-150 hover:bg-surface-2">
+                <tr
+                  key={rowKey(row)}
+                  data-rowlink={rowHref && rowHref(row) ? '' : undefined}
+                  onClick={(e) => {
+                    const href = rowHref?.(row);
+                    if (!href || (e.target as HTMLElement).closest('a, button, input, select, [data-copy], summary')) return;
+                    router.push(href);
+                  }}
+                  className="border-b border-line transition-colors duration-150 hover:bg-surface-2"
+                >
                   {columns.map((c) => (
                     <td key={c.key} className={`px-4 py-3 align-middle ${c.align === 'end' ? 'text-end' : 'text-start'}`}>{c.render(row)}</td>
                   ))}

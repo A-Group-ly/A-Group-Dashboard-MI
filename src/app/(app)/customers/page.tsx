@@ -77,6 +77,7 @@ export default function CustomersPage() {
           pageSize={25}
           searchPlaceholder={t('cust.searchPh')}
           reloadKey={reload}
+          rowHref={(c) => `/customers/${c.id}`}
           emptyAction={can('customers:write') ? <Button onClick={() => setCreating(true)}>+ {t('cust.add')}</Button> : undefined}
           exportFilename="a-group-customers.csv"
           toolbarEnd={can('customers:write') ? <Button onClick={() => setCreating(true)}>+ {t('cust.add')}</Button> : null}
